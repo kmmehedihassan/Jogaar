@@ -10,7 +10,7 @@ let server;
 let base;
 
 test.before(async () => {
-  const app = createApp(openDb(":memory:"));
+  const app = createApp(openDb(":memory:"), { adminEmails: ["admin@example.com"] });
   await new Promise((resolve) => {
     server = app.listen(0, resolve);
   });
@@ -248,4 +248,125 @@ test("rate-limits repeated failed logins", async () => {
     last = await call("/auth/login", { method: "POST", body: { email: u.email, password: "wrong" } });
   }
   assert.equal(last.status, 429);
+});
+
+async function adminUser() {
+  const reg = await call("/auth/register", {
+    method: "POST",
+    body: { name: "Admin Person", email: "admin@example.com", password: "Secret123" },
+  });
+  if (reg.status === 201) return reg.data;
+  const login = await call("/auth/login", { method: "POST", body: { email: "admin@example.com", password: "Secret123" } });
+  return login.data;
+}
+
+test("notifications: owners hear about pledges and comments, backers about updates", async () => {
+  const owner = await newUser("Owner Person");
+  const backer = await newUser("Backer Person");
+  const { data: c } = await call("/campaigns", { method: "POST", token: owner.token, body: campaignBody });
+  assert.equal(c.verified, false, "new campaigns start unverified");
+
+  await call(`/campaigns/${c.id}/pledges`, { method: "POST", token: backer.token, body: { amount: 1000, method: "bKash" } });
+  await call(`/campaigns/${c.id}/comments`, { method: "POST", token: backer.token, body: { body: "Nice!" } });
+  await call(`/campaigns/${c.id}/comments`, { method: "POST", token: owner.token, body: { body: "Thanks" } });
+
+  const ownerNotes = await call("/me/notifications", { token: owner.token });
+  assert.equal(ownerNotes.data.unread, 2, "own comment doesn't notify the owner");
+  assert.deepEqual(ownerNotes.data.items.map((n) => n.type).sort(), ["comment", "pledge"]);
+  const pledgeNote = ownerNotes.data.items.find((n) => n.type === "pledge");
+  assert.equal(pledgeNote.amount, 1000);
+  assert.equal(pledgeNote.actorName, "Backer Person");
+
+  await call(`/campaigns/${c.id}/updates`, {
+    method: "POST",
+    token: owner.token,
+    body: { title: "Big news", body: "We opened the stall today!" },
+  });
+  const backerNotes = await call("/me/notifications", { token: backer.token });
+  assert.equal(backerNotes.data.items[0].type, "update");
+  assert.equal(backerNotes.data.items[0].campaignTitle, c.title);
+
+  assert.equal((await call("/me/notifications/read", { method: "POST", token: owner.token })).status, 204);
+  assert.equal((await call("/me/notifications", { token: owner.token })).data.unread, 0);
+});
+
+test("admins verify and hide campaigns; others can't", async () => {
+  const admin = await adminUser();
+  assert.equal(admin.user.isAdmin, true);
+  const owner = await newUser("Owner Person");
+  assert.equal(owner.user.isAdmin, false);
+  const { data: c } = await call("/campaigns", { method: "POST", token: owner.token, body: campaignBody });
+
+  assert.equal((await call("/admin/overview", { token: owner.token })).status, 403);
+  assert.equal((await call(`/admin/campaigns/${c.id}`, { method: "PATCH", token: owner.token, body: { verified: true } })).status, 403);
+
+  const verified = await call(`/admin/campaigns/${c.id}`, { method: "PATCH", token: admin.token, body: { verified: true } });
+  assert.equal(verified.data.verified, true);
+  const notes = await call("/me/notifications", { token: owner.token });
+  assert.ok(notes.data.items.some((n) => n.type === "verified"));
+
+  await call(`/admin/campaigns/${c.id}`, { method: "PATCH", token: admin.token, body: { hidden: true } });
+  const list = await call("/campaigns");
+  assert.ok(!list.data.some((x) => x.id === c.id), "hidden campaigns are not listed");
+  assert.equal((await call(`/campaigns/${c.id}`)).status, 404, "hidden from the public");
+  assert.equal((await call(`/campaigns/${c.id}`, { token: owner.token })).status, 200, "owner still sees it");
+  assert.equal((await call(`/campaigns/${c.id}`, { token: admin.token })).status, 200, "admin still sees it");
+  const backer = await newUser();
+  assert.equal(
+    (await call(`/campaigns/${c.id}/pledges`, { method: "POST", token: backer.token, body: { amount: 500, method: "bKash" } })).status,
+    404
+  );
+  const overview = await call("/admin/overview", { token: admin.token });
+  assert.ok(overview.data.campaigns.some((x) => x.id === c.id && x.hidden));
+  assert.ok(overview.data.stats.users >= 3);
+});
+
+test("reports: users report, admins remove or dismiss", async () => {
+  const admin = await adminUser();
+  const owner = await newUser("Owner Person");
+  const reporter = await newUser("Reporter Person");
+  const { data: c } = await call("/campaigns", { method: "POST", token: owner.token, body: campaignBody });
+  const { data: comment } = await call(`/campaigns/${c.id}/comments`, {
+    method: "POST",
+    token: owner.token,
+    body: { body: "Buy cheap watches at spam.example" },
+  });
+
+  assert.equal((await call("/reports", { method: "POST", body: { targetType: "comment", targetId: comment.id, reason: "spam" } })).status, 401);
+  const bad = await call("/reports", { method: "POST", token: reporter.token, body: { targetType: "comment", targetId: comment.id, reason: "meh" } });
+  assert.equal(bad.status, 400);
+  for (let i = 0; i < 2; i++) {
+    const ok = await call("/reports", {
+      method: "POST",
+      token: reporter.token,
+      body: { targetType: "comment", targetId: comment.id, reason: "spam" },
+    });
+    assert.equal(ok.status, 201);
+  }
+  await call("/reports", { method: "POST", token: reporter.token, body: { targetType: "campaign", targetId: c.id, reason: "fraud", details: "Looks fake" } });
+
+  let overview = await call("/admin/overview", { token: admin.token });
+  const mine = overview.data.reports.filter((r) => r.campaignId === c.id);
+  assert.equal(mine.length, 2, "duplicate reports from the same person are merged");
+  const commentReport = mine.find((r) => r.targetType === "comment");
+  assert.equal(commentReport.commentBody, "Buy cheap watches at spam.example");
+  assert.equal(commentReport.reporterName, "Reporter Person");
+
+  assert.equal((await call(`/admin/reports/${commentReport.id}/resolve`, { method: "POST", token: reporter.token, body: { action: "remove" } })).status, 403);
+  await call(`/admin/reports/${commentReport.id}/resolve`, { method: "POST", token: admin.token, body: { action: "remove" } });
+  const detail = await call(`/campaigns/${c.id}`);
+  assert.equal(detail.data.comments.length, 0, "removed comment is gone");
+
+  const campaignReport = mine.find((r) => r.targetType === "campaign");
+  await call(`/admin/reports/${campaignReport.id}/resolve`, { method: "POST", token: admin.token, body: { action: "dismiss" } });
+  overview = await call("/admin/overview", { token: admin.token });
+  assert.equal(overview.data.reports.filter((r) => r.campaignId === c.id).length, 0);
+  assert.equal((await call(`/campaigns/${c.id}`)).status, 200, "dismissed report leaves the campaign visible");
+});
+
+test("admins can delete any comment", async () => {
+  const admin = await adminUser();
+  const u = await newUser();
+  const { data: comment } = await call("/campaigns/retro-cafe/comments", { method: "POST", token: u.token, body: { body: "Hello there" } });
+  assert.equal((await call(`/comments/${comment.id}`, { method: "DELETE", token: admin.token })).status, 204);
 });

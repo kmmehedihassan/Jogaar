@@ -22,10 +22,12 @@ function freshDb() {
   return {
     users: [],
     sessions: {},
-    campaigns: seeds.map(({ seedComments, ...c }) => c),
+    campaigns: seeds.map(({ seedComments, ...c }) => ({ ...c, verified: true, hidden: false })),
     pledges: [],
     comments: seeds.flatMap((c) => c.seedComments),
     saved: {},
+    reports: [],
+    notifications: [],
   };
 }
 
@@ -37,11 +39,15 @@ function migrate(db) {
   db.campaigns = db.campaigns || [];
   db.pledges = db.pledges || [];
   db.saved = db.saved || {};
+  db.reports = db.reports || [];
+  db.notifications = db.notifications || [];
   if (!Array.isArray(db.comments)) db.comments = seeds.flatMap((c) => c.seedComments);
   db.campaigns.forEach((c) => {
     const seed = seeds.find((s) => s.id === c.id);
     if (!Array.isArray(c.updates)) c.updates = [];
     if (!Array.isArray(c.rewards)) c.rewards = seed ? seed.rewards : [];
+    if (typeof c.verified !== "boolean") c.verified = !c.ownerId;
+    if (typeof c.hidden !== "boolean") c.hidden = false;
   });
   return db;
 }
@@ -116,6 +122,7 @@ function publicUser(u) {
     email: u.email,
     contact: u.contact || "",
     bio: u.bio || "",
+    isAdmin: Boolean(u.isAdmin),
     createdAt: u.createdAt,
   };
 }
@@ -127,14 +134,40 @@ function requireUser(db, token) {
   return user;
 }
 
-function findCampaign(db, id) {
+function canSeeHidden(user, campaign) {
+  return Boolean(user && (user.isAdmin || user.id === campaign.ownerId));
+}
+
+function findCampaign(db, id, viewer) {
   const campaign = db.campaigns.find((c) => c.id === id);
-  if (!campaign) throw new ApiError("This campaign no longer exists.", null, 404);
+  if (!campaign || (campaign.hidden && !canSeeHidden(viewer, campaign))) {
+    throw new ApiError("This campaign no longer exists.", null, 404);
+  }
   return campaign;
 }
 
+function optionalUser(db, token) {
+  const userId = token && db.sessions[token];
+  return (userId && db.users.find((u) => u.id === userId)) || null;
+}
+
+function notify(db, userId, type, campaign, actorName = "", amount = null) {
+  if (!userId) return;
+  db.notifications.push({
+    id: randomId(8),
+    userId,
+    type,
+    campaignId: campaign.id,
+    campaignTitle: campaign.title,
+    actorName,
+    amount,
+    read: false,
+    createdAt: Date.now(),
+  });
+}
+
 function ownCampaign(db, user, id) {
-  const campaign = findCampaign(db, id);
+  const campaign = findCampaign(db, id, user);
   if (campaign.ownerId !== user.id) throw new ApiError("Only the campaign owner can do that.", null, 403);
   return campaign;
 }
@@ -196,6 +229,8 @@ export async function register({ name, email, password, contact }) {
       bio: "",
       salt,
       passwordHash,
+      // In this browser-only demo, the first account created becomes the admin.
+      isAdmin: db.users.length === 0,
       createdAt: Date.now(),
     };
     db.users.push(user);
@@ -264,14 +299,14 @@ export async function changePassword(token, { current, next }) {
 export async function listCampaigns() {
   await delay();
   const db = loadDb();
-  return db.campaigns.map((c) => present(db, c));
+  return db.campaigns.filter((c) => !c.hidden).map((c) => present(db, c));
 }
 
-export async function getCampaign(id) {
+export async function getCampaign(id, token) {
   await delay();
   const db = loadDb();
   const campaign = db.campaigns.find((c) => c.id === id);
-  if (!campaign) return null;
+  if (!campaign || (campaign.hidden && !canSeeHidden(optionalUser(db, token), campaign))) return null;
   const pledges = db.pledges
     .filter((p) => p.campaignId === id)
     .sort((a, b) => b.createdAt - a.createdAt)
@@ -302,6 +337,8 @@ export async function createCampaign(token, data) {
       backers: 0,
       rewards: cleanRewards(data.rewards),
       updates: [],
+      verified: false,
+      hidden: false,
       createdAt: now,
       endsAt: now + Number(data.durationDays) * DAY,
     };
@@ -353,6 +390,8 @@ export async function postUpdate(token, id, { title, body }) {
   return update((db) => {
     const campaign = ownCampaign(db, requireUser(db, token), id);
     campaign.updates.unshift({ id: randomId(6), title: title.trim(), body: body.trim(), createdAt: Date.now() });
+    const backerIds = new Set(db.pledges.filter((p) => p.campaignId === id).map((p) => p.userId));
+    backerIds.forEach((uid) => notify(db, uid, "update", campaign, campaign.ownerName));
     return present(db, campaign);
   });
 }
@@ -366,7 +405,8 @@ export async function pledge(token, campaignId, { amount, message, method, anony
   await delay();
   return update((db) => {
     const user = requireUser(db, token);
-    const campaign = findCampaign(db, campaignId);
+    const campaign = findCampaign(db, campaignId, user);
+    if (campaign.hidden) throw new ApiError("This campaign is under review.", null, 409);
     if (campaign.endsAt <= Date.now()) throw new ApiError("This campaign has ended.", null, 409);
     if (campaign.ownerId && campaign.ownerId === user.id) {
       throw new ApiError("You can't back your own campaign.", null, 403);
@@ -395,6 +435,7 @@ export async function pledge(token, campaignId, { amount, message, method, anony
     db.pledges.push(record);
     campaign.raised += value;
     if (!isRepeatBacker) campaign.backers += 1;
+    notify(db, campaign.ownerId, "pledge", campaign, record.userName, value);
     const { userId, ...publicPledge } = record;
     return { campaign: present(db, campaign), pledge: publicPledge };
   });
@@ -406,7 +447,7 @@ export async function addComment(token, campaignId, body) {
   await delay();
   return update((db) => {
     const user = requireUser(db, token);
-    const campaign = findCampaign(db, campaignId);
+    const campaign = findCampaign(db, campaignId, user);
     const comment = {
       id: randomId(8),
       campaignId,
@@ -417,6 +458,7 @@ export async function addComment(token, campaignId, body) {
       createdAt: Date.now(),
     };
     db.comments.push(comment);
+    if (campaign.ownerId !== user.id) notify(db, campaign.ownerId, "comment", campaign, user.name);
     return comment;
   });
 }
@@ -428,7 +470,7 @@ export async function deleteComment(token, commentId) {
     const comment = db.comments.find((m) => m.id === commentId);
     if (!comment) return;
     const campaign = db.campaigns.find((c) => c.id === comment.campaignId);
-    const allowed = comment.userId === user.id || (campaign && campaign.ownerId === user.id);
+    const allowed = comment.userId === user.id || (campaign && campaign.ownerId === user.id) || user.isAdmin;
     if (!allowed) throw new ApiError("You can only delete your own comments.", null, 403);
     db.comments = db.comments.filter((m) => m.id !== commentId);
   });
@@ -442,7 +484,7 @@ export async function getSavedIds(token) {
 export async function toggleSaved(token, id) {
   return update((db) => {
     const user = requireUser(db, token);
-    findCampaign(db, id);
+    findCampaign(db, id, user);
     const list = db.saved[user.id] || [];
     db.saved[user.id] = list.includes(id) ? list.filter((x) => x !== id) : [id, ...list];
     return db.saved[user.id];
@@ -463,7 +505,150 @@ export async function getDashboard(token) {
     });
   const saved = (db.saved[user.id] || [])
     .map((id) => db.campaigns.find((c) => c.id === id))
-    .filter(Boolean)
+    .filter((c) => c && !c.hidden)
     .map((c) => present(db, c));
   return { myCampaigns, myPledges, saved };
+}
+
+/* ---------------------------- notifications ---------------------------- */
+
+export async function getNotifications(token) {
+  const db = loadDb();
+  const user = requireUser(db, token);
+  const mine = db.notifications.filter((n) => n.userId === user.id).sort((a, b) => b.createdAt - a.createdAt);
+  return {
+    items: mine.slice(0, 30).map(({ userId, ...n }) => n),
+    unread: mine.filter((n) => !n.read).length,
+  };
+}
+
+export async function markNotificationsRead(token) {
+  update((db) => {
+    const user = requireUser(db, token);
+    db.notifications.forEach((n) => {
+      if (n.userId === user.id) n.read = true;
+    });
+  });
+}
+
+/* ------------------------------- reports ------------------------------- */
+
+const REPORT_REASONS = ["spam", "fraud", "offensive", "other"];
+
+export async function report(token, { targetType, targetId, reason, details }) {
+  if (!REPORT_REASONS.includes(reason)) throw new ApiError("Choose a reason.", "reason", 400);
+  await delay();
+  update((db) => {
+    const user = requireUser(db, token);
+    let campaignId;
+    if (targetType === "campaign") campaignId = findCampaign(db, targetId, user).id;
+    else if (targetType === "comment") {
+      const comment = db.comments.find((m) => m.id === targetId);
+      if (!comment) throw new ApiError("That comment no longer exists.", null, 404);
+      campaignId = comment.campaignId;
+    } else throw new ApiError("Invalid request.", null, 400);
+    const dup = db.reports.some(
+      (r) => r.userId === user.id && r.targetType === targetType && r.targetId === targetId && !r.resolvedAt
+    );
+    if (!dup) {
+      db.reports.push({
+        id: randomId(8),
+        targetType,
+        targetId,
+        campaignId,
+        userId: user.id,
+        reason,
+        details: String(details || "").trim().slice(0, 300),
+        createdAt: Date.now(),
+        resolvedAt: null,
+      });
+    }
+  });
+}
+
+/* -------------------------------- admin -------------------------------- */
+
+function requireAdmin(db, token) {
+  const user = requireUser(db, token);
+  if (!user.isAdmin) throw new ApiError("Only admins can do that.", null, 403);
+  return user;
+}
+
+export async function getAdminOverview(token) {
+  await delay();
+  const db = loadDb();
+  requireAdmin(db, token);
+  const reports = db.reports
+    .filter((r) => !r.resolvedAt)
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .map((r) => {
+      const campaign = db.campaigns.find((c) => c.id === r.campaignId);
+      const comment = r.targetType === "comment" ? db.comments.find((m) => m.id === r.targetId) : null;
+      const reporter = db.users.find((u) => u.id === r.userId);
+      return {
+        id: r.id,
+        targetType: r.targetType,
+        targetId: r.targetId,
+        campaignId: r.campaignId,
+        campaignTitle: campaign ? campaign.title : null,
+        commentBody: comment ? comment.body : null,
+        commentAuthor: comment ? comment.userName : null,
+        reason: r.reason,
+        details: r.details,
+        reporterName: reporter ? reporter.name : "",
+        createdAt: r.createdAt,
+      };
+    });
+  return {
+    stats: {
+      users: db.users.length,
+      campaigns: db.campaigns.length,
+      pledges: db.pledges.length,
+      raised: db.pledges.reduce((s, p) => s + p.amount, 0),
+      openReports: reports.length,
+    },
+    campaigns: [...db.campaigns].sort((a, b) => b.createdAt - a.createdAt).map((c) => present(db, c)),
+    reports,
+  };
+}
+
+export async function adminUpdateCampaign(token, id, { verified, hidden }) {
+  await delay();
+  return update((db) => {
+    requireAdmin(db, token);
+    const campaign = db.campaigns.find((c) => c.id === id);
+    if (!campaign) throw new ApiError("This campaign no longer exists.", null, 404);
+    if (typeof verified === "boolean") {
+      if (verified && !campaign.verified) notify(db, campaign.ownerId, "verified", campaign);
+      campaign.verified = verified;
+    }
+    if (typeof hidden === "boolean") {
+      if (hidden && !campaign.hidden) notify(db, campaign.ownerId, "hidden", campaign);
+      campaign.hidden = hidden;
+    }
+    return present(db, campaign);
+  });
+}
+
+export async function resolveReport(token, id, action) {
+  await delay();
+  update((db) => {
+    requireAdmin(db, token);
+    const r = db.reports.find((x) => x.id === id);
+    if (!r) throw new ApiError("That report no longer exists.", null, 404);
+    if (action === "remove") {
+      if (r.targetType === "comment") db.comments = db.comments.filter((m) => m.id !== r.targetId);
+      else {
+        const campaign = db.campaigns.find((c) => c.id === r.targetId);
+        if (campaign && !campaign.hidden) {
+          campaign.hidden = true;
+          notify(db, campaign.ownerId, "hidden", campaign);
+        }
+      }
+    }
+    const now = Date.now();
+    db.reports.forEach((x) => {
+      if (x.targetType === r.targetType && x.targetId === r.targetId && !x.resolvedAt) x.resolvedAt = now;
+    });
+  });
 }

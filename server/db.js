@@ -80,6 +80,30 @@ CREATE TABLE IF NOT EXISTS saved (
   created_at INTEGER NOT NULL,
   PRIMARY KEY (user_id, campaign_id)
 );
+CREATE TABLE IF NOT EXISTS reports (
+  id TEXT PRIMARY KEY,
+  target_type TEXT NOT NULL CHECK (target_type IN ('campaign', 'comment')),
+  target_id TEXT NOT NULL,
+  campaign_id TEXT NOT NULL,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reason TEXT NOT NULL,
+  details TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  resolved_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS notifications (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  campaign_id TEXT,
+  campaign_title TEXT NOT NULL DEFAULT '',
+  actor_name TEXT NOT NULL DEFAULT '',
+  amount INTEGER,
+  created_at INTEGER NOT NULL,
+  read_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_reports_open ON reports(resolved_at);
 CREATE INDEX IF NOT EXISTS idx_pledges_campaign ON pledges(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_pledges_user ON pledges(user_id);
 CREATE INDEX IF NOT EXISTS idx_comments_campaign ON comments(campaign_id);
@@ -116,15 +140,28 @@ function seed(db, now = Date.now()) {
   })();
 }
 
+/** Adds columns introduced after a database was first created. */
+function migrate(db) {
+  const has = (table, col) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
+  if (!has("campaigns", "verified")) {
+    db.exec("ALTER TABLE campaigns ADD COLUMN verified INTEGER NOT NULL DEFAULT 0");
+    // Sample campaigns (no owner account) count as verified.
+    db.exec("UPDATE campaigns SET verified = 1 WHERE owner_id IS NULL");
+  }
+  if (!has("campaigns", "hidden")) db.exec("ALTER TABLE campaigns ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0");
+}
+
 function openDb(file = process.env.JOGAAR_DB || path.join(__dirname, "data", "jogaar.db")) {
   if (file !== ":memory:") fs.mkdirSync(path.dirname(file), { recursive: true });
   const db = new Database(file);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
   db.exec(SCHEMA);
+  migrate(db);
   // Add the sample campaigns once, the first time the database is created.
   if (!db.prepare("SELECT 1 FROM meta WHERE key = 'seeded'").get()) {
     seed(db);
+    db.prepare("UPDATE campaigns SET verified = 1").run();
     db.prepare("INSERT INTO meta (key, value) VALUES ('seeded', ?)").run(String(Date.now()));
   }
   return db;

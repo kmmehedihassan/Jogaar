@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { HiLocationMarker } from "react-icons/hi";
+import { HiBadgeCheck, HiLocationMarker } from "react-icons/hi";
 import ProgressBar from "./ProgressBar";
 import { SaveButton } from "./CampaignActions";
 import { useUi } from "../context/UiContext";
@@ -21,7 +21,12 @@ export default function CampaignCard({ campaign }) {
           {pct >= 100 && <span className="badge-funded">{t("card.badgeFunded")}</span>}
         </div>
         <div className="campaign-card__body">
-          <h3 className="campaign-card__title">{campaign.title}</h3>
+          <h3 className="campaign-card__title">
+            {campaign.title}
+            {campaign.verified && (
+              <HiBadgeCheck className="verified-icon" aria-label={t("card.verified")} title={t("card.verified")} />
+            )}
+          </h3>
           <p className="campaign-card__summary">{campaign.summary}</p>
           <p className="muted small campaign-card__loc">
             <HiLocationMarker /> {campaign.location}

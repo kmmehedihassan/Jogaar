@@ -6,6 +6,7 @@ import "@testing-library/jest-dom";
 import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
 import { UiProvider } from "./context/UiContext";
+import * as api from "./api/client";
 import { resetLocalData } from "./api/client";
 
 function renderAt(path) {
@@ -279,4 +280,88 @@ test("the interface can switch to Bangla and back", async () => {
 
   userEvent.click(screen.getByRole("button", { name: /View in English/ }));
   expect(await screen.findByRole("heading", { name: /Small businesses/ })).toBeInTheDocument();
+});
+
+const STALL = {
+  title: "Rahim's Tea Stall",
+  category: "Food & Drink",
+  location: "Mirpur, Dhaka",
+  goal: 50000,
+  durationDays: 30,
+  summary: "A clean, friendly tea stall near the stadium.",
+  story: "I have sold tea from a flask for five years. A proper stall with a stove and seating will let me serve more customers.",
+  image: "cafe",
+  rewards: [],
+};
+const account = (name, email) => api.register({ name, email, password: "Secret123", contact: "" });
+const signInAs = (session) => window.localStorage.setItem("jogaar:token", session.token);
+
+test("owners get notified about new contributions", async () => {
+  await account("Admin Person", "admin@example.com");
+  const owner = await account("Owner Person", "owner@example.com");
+  const stall = await api.createCampaign(owner.token, STALL);
+  const backer = await account("Backer Person", "backer@example.com");
+  await api.pledge(backer.token, stall.id, { amount: 1000, method: "bKash" });
+
+  signInAs(owner);
+  renderAt("/");
+  const bell = await screen.findByRole("button", { name: "Notifications (1 unread)" });
+  fireEvent.click(bell);
+  expect(await screen.findByText("Backer Person backed Rahim's Tea Stall with ৳1,000.")).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole("button", { name: "Notifications" })).toBeInTheDocument());
+});
+
+test("a user can report a campaign", async () => {
+  renderAt("/register");
+  await signUp();
+  await screen.findByRole("heading", { name: "Hi, Rahim" });
+  userEvent.click(screen.getAllByRole("link", { name: "Discover" })[0]);
+  userEvent.click(await screen.findByText("Retro Cafe"));
+  userEvent.click(await screen.findByRole("button", { name: "Report" }));
+
+  const dialog = await screen.findByRole("dialog", { name: "Report this campaign" });
+  userEvent.click(screen.getByRole("button", { name: "Send report" }));
+  expect(await screen.findByText("Choose a reason.")).toBeInTheDocument();
+  userEvent.click(screen.getByLabelText("Fraud or a fake campaign"));
+  userEvent.type(screen.getByLabelText("Details (optional)"), "Photos look copied");
+  userEvent.click(screen.getByRole("button", { name: "Send report" }));
+  expect(await screen.findByText("Thanks — our team will review your report.")).toBeInTheDocument();
+  expect(dialog).not.toBeInTheDocument();
+});
+
+test("admins can verify campaigns and act on reports", async () => {
+  window.confirm = jest.fn(() => true);
+  const admin = await account("Admin Person", "admin@example.com");
+  const owner = await account("Owner Person", "owner@example.com");
+  const stall = await api.createCampaign(owner.token, STALL);
+  const reporter = await account("Reporter Person", "reporter@example.com");
+  await api.report(reporter.token, { targetType: "campaign", targetId: stall.id, reason: "spam", details: "Duplicate" });
+  expect(admin.user.isAdmin).toBe(true);
+  expect(owner.user.isAdmin).toBe(false);
+
+  signInAs(admin);
+  renderAt("/admin");
+  expect(await screen.findByText("Campaign reported")).toBeInTheDocument();
+  expect(screen.getByText("Reported by Reporter Person", { exact: false })).toBeInTheDocument();
+  userEvent.click(screen.getByRole("button", { name: "Hide campaign" }));
+  expect(await screen.findByText("No open reports. Nice and quiet.")).toBeInTheDocument();
+
+  userEvent.click(screen.getByRole("tab", { name: "Campaigns" }));
+  userEvent.click(screen.getByRole("button", { name: "Hidden" }));
+  expect(await screen.findByText("Rahim's Tea Stall")).toBeInTheDocument();
+  userEvent.click(screen.getByRole("button", { name: /Verify/ }));
+  await screen.findByText("Saved.");
+
+  // The hidden campaign is gone from the public list, and the owner was told.
+  expect((await api.listCampaigns()).some((c) => c.id === stall.id)).toBe(false);
+  const notes = await api.getNotifications(owner.token);
+  expect(notes.items.map((n) => n.type).sort()).toEqual(["hidden", "verified"]);
+});
+
+test("non-admins are sent away from the admin page", async () => {
+  await account("Admin Person", "admin@example.com");
+  const someone = await account("Someone Else", "someone@example.com");
+  signInAs(someone);
+  renderAt("/admin");
+  expect(await screen.findByRole("heading", { name: "Hi, Someone" })).toBeInTheDocument();
 });

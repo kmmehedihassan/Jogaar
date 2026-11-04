@@ -285,13 +285,13 @@ export function EditCampaign() {
 
   useEffect(() => {
     let alive = true;
-    getCampaign(id)
+    getCampaign(id, token)
       .then((d) => alive && setCampaign(d ? d.campaign : null))
       .catch(() => alive && setCampaign(null));
     return () => {
       alive = false;
     };
-  }, [id]);
+  }, [id, token]);
 
   if (campaign === undefined) return <div className="page"><Spinner /></div>;
   if (campaign === null || campaign.ownerId !== user.id) return <Redirect to={`/campaigns/${id}`} />;
