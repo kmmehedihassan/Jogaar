@@ -8,6 +8,8 @@ import storyJafor from "../assets/images/story-jafor.jpg";
 import storyFrise from "../assets/images/story-frise.jpg";
 import storyAbdullah from "../assets/images/story-abdullah.jpg";
 import storyNadia from "../assets/images/story-nadia.jpg";
+import CAMPAIGN_SEED from "./campaigns.json";
+import { buildSeed } from "./buildSeed";
 
 export const CATEGORIES = [
   "Food & Drink",
@@ -38,157 +40,16 @@ export const CATEGORY_IMAGES = {
   Services: "handloom",
 };
 
-const DAY = 24 * 60 * 60 * 1000;
 
 /** Campaigns that exist on first run. Dates are relative to first load. */
 export function seedCampaigns(now = Date.now()) {
-  return [
-    {
-      id: "mishu-pottery",
-      title: "Mishu's Pottery Studio",
-      ownerName: "Mishu Akter",
-      category: "Crafts",
-      location: "Dhamrai, Dhaka",
-      image: "pottery",
-      summary:
-        "Expanding a family pottery business with a second kiln and a small showroom.",
-      story: [
-        "We have run a small pottery business for three generations, making hand-painted cups, vases and planters from local clay. Demand has outgrown our single wood-fired kiln.",
-        "Your support will pay for a modern, energy-efficient kiln and a small showroom by the highway so travellers can buy directly from us instead of through middlemen.",
-        "Every backer gets our heartfelt thanks, and contributions above ৳2,000 receive a hand-painted cup from the first firing.",
-      ],
-      goal: 300000,
-      raised: 279000,
-      backers: 214,
-      createdAt: now - 40 * DAY,
-      updates: [
-        {
-          id: "u2",
-          title: "93% there — thank you!",
-          body: "We're almost fully funded. The kiln supplier has confirmed delivery for next month, and we've started clearing space for the showroom.",
-          createdAt: now - 3 * DAY,
-        },
-        {
-          id: "u1",
-          title: "First 100 backers",
-          body: "We never expected this much support in the first week. Every one of you will get a personal thank-you card.",
-          createdAt: now - 33 * DAY,
-        },
-      ],
-      endsAt: now + 6 * DAY,
-    },
-    {
-      id: "karim-poultry",
-      title: "Karim's Poultry Farm Expansion",
-      ownerName: "Abdul Karim",
-      category: "Agriculture",
-      location: "Trishal, Mymensingh",
-      image: "poultry",
-      summary:
-        "Doubling egg production with new cages, ventilation and a backup generator.",
-      story: [
-        "I started with 200 hens in a tin shed. Today we supply eggs to six local shops and a school canteen.",
-        "Heat waves and power cuts cost us birds every summer. This campaign funds better ventilation, a backup generator and 800 more laying hens.",
-        "With the expansion we will hire three more people from our village.",
-      ],
-      goal: 500000,
-      raised: 315000,
-      backers: 187,
-      createdAt: now - 25 * DAY,
-      updates: [
-        {
-          id: "u1",
-          title: "Generator ordered",
-          body: "Thanks to your support we've ordered the backup generator. No more lost birds during load-shedding this summer.",
-          createdAt: now - 8 * DAY,
-        },
-      ],
-      endsAt: now + 20 * DAY,
-    },
-    {
-      id: "tangail-handloom",
-      title: "Tangail Handloom Collective",
-      ownerName: "Rina Begum",
-      category: "Crafts",
-      location: "Tangail",
-      image: "handloom",
-      summary:
-        "Helping twelve weaving families sell their sarees online at fair prices.",
-      story: [
-        "Our collective of twelve weaving families makes traditional Tangail sarees on hand looms.",
-        "We want to build a simple online shop, buy better yarn in bulk and pay for product photography so our work reaches buyers across the country.",
-        "Funds are shared transparently between all member families.",
-      ],
-      goal: 350000,
-      raised: 189000,
-      backers: 142,
-      createdAt: now - 18 * DAY,
-      endsAt: now + 27 * DAY,
-    },
-    {
-      id: "retro-cafe",
-      title: "Retro Cafe",
-      ownerName: "Tanvir Hasan",
-      category: "Food & Drink",
-      location: "Zindabazar, Sylhet",
-      image: "cafe",
-      summary:
-        "A cosy burger and coffee spot for students, with live music on weekends.",
-      story: [
-        "Retro Cafe started as a food cart outside the university gate. Our burgers sold out every evening.",
-        "We have found a small space nearby and need help with the kitchen fit-out, furniture and the first three months of rent.",
-        "Backers get a free meal on opening week and their names on our wall of founders.",
-      ],
-      goal: 400000,
-      raised: 100000,
-      backers: 76,
-      createdAt: now - 10 * DAY,
-      endsAt: now + 35 * DAY,
-    },
-    {
-      id: "mayer-dowa-jewellery",
-      title: "Mayer Dowa Jewellery",
-      ownerName: "Shirin & Lucky",
-      category: "Retail",
-      location: "New Market, Chattogram",
-      image: "jewellery",
-      summary:
-        "Two sisters turning their market stall into a proper handmade jewellery shop.",
-      story: [
-        "We make and sell handmade bangles, earrings and necklaces from a small stall in New Market.",
-        "This campaign will fund display cases, tools and stock for a permanent shop front so we can serve customers all year round.",
-      ],
-      goal: 250000,
-      raised: 25000,
-      backers: 19,
-      createdAt: now - 5 * DAY,
-      endsAt: now + 40 * DAY,
-    },
-    {
-      id: "untitled-boutique",
-      title: "Untitled Boutique House",
-      ownerName: "Farzana Rahman",
-      category: "Fashion",
-      location: "Shaheb Bazar, Rajshahi",
-      image: "boutique",
-      summary:
-        "Affordable, locally tailored everyday wear designed in Rajshahi.",
-      story: [
-        "I design simple, comfortable everyday clothes and work with four local tailors.",
-        "Funding will buy two industrial sewing machines and fabric for our first full collection.",
-      ],
-      goal: 200000,
-      raised: 10000,
-      backers: 8,
-      createdAt: now - 2 * DAY,
-      endsAt: now + 43 * DAY,
-    },
-  ].map((c) => ({ updates: [], ...c }));
+  return buildSeed(CAMPAIGN_SEED, now);
 }
 
 export const STORIES = [
   {
     id: "jafor",
+    bn: {"title": "জাফরের গল্প", "business": "মুদি দোকান, মিরপুর", "excerpt": "কীভাবে জোগাড় সাবেক রিকশাচালক জাফরকে একটি ভয়াবহ সড়ক দুর্ঘটনার পর ঘুরে দাঁড়াতে সাহায্য করেছে, যখন সব আশা শেষ মনে হচ্ছিল।", "body": ["এগারো বছর ধরে জাফর মিরপুরের রাস্তায় রিকশা চালিয়েছেন। ২০২১ সালের এক সড়ক দুর্ঘটনায় তিনি কাজ করার সামর্থ্য হারান, আর হাসপাতালের বিলে পরিবারের সব সঞ্চয় শেষ হয়ে যায়।", "এক প্রতিবেশী তাঁকে জোগাড়ে একটি ক্যাম্পেইন খুলতে সাহায্য করেন, যাতে তিনি বসে বসে চালাতে পারেন এমন একটি ছোট মুদি দোকান দিতে পারেন। ৩১২ জন মানুষ অবদান রাখেন — তাঁদের অনেকেই ছিলেন তাঁর পুরোনো যাত্রী।", "আজ তাঁর দোকান পাঁচ সদস্যের পরিবারটিকে চালাচ্ছে, আর ডেলিভারির কাজে তিনি তাঁর ভাতিজাকেও নিয়োগ দিয়েছেন।"]},
     name: "Jafor",
     title: "Jafor's Story",
     business: "Corner grocery, Mirpur",
@@ -204,6 +65,7 @@ export const STORIES = [
   },
   {
     id: "frise",
+    bn: {"title": "ফ্রাইসের গল্প", "business": "ফাস্ট ফুড চেইন, ঢাকা", "excerpt": "বিশ্ববিদ্যালয়ের ছাত্র ফাইয়াজ পরিবারকে সাহায্য করতে একটি ছোট ফাস্ট ফুড চেইনের স্বপ্ন দেখতেন — কিন্তু শুরু করার মতো টাকা ছিল না।", "body": ["পরিবারকে স্বাবলম্বী করা বিশ্ববিদ্যালয়ের ছাত্র ফাইয়াজের জন্য সহজ ছিল না। তিনি ফ্রাই ও স্ন্যাকসের একটি ছোট ব্র্যান্ডের পরিকল্পনা করেন, কিন্তু সরঞ্জাম কেনার টাকা ছিল না।", "তাঁর জোগাড় ক্যাম্পেইনে সমর্থকদের উদ্বোধনের সময় বিনামূল্যে খাবারের প্রতিশ্রুতি দেওয়া হয়। উনিশ দিনেই তিনি লক্ষ্যে পৌঁছে যান।", "ফ্রাইসের এখন ঢাকায় তিনটি আউটলেট, যেখানে চৌদ্দজন কাজ করেন — তাঁদের বেশিরভাগই শিক্ষার্থী।"]},
     name: "Faiaz",
     title: "The Story of Frise",
     business: "Fast food chain, Dhaka",
@@ -219,6 +81,7 @@ export const STORIES = [
   },
   {
     id: "abdullah",
+    bn: {"title": "আবদুল্লাহর গল্প", "business": "মুরগি সরবরাহকারী, পুরান ঢাকা", "excerpt": "অনাগ্রহী ক্রেতাদের রাজি করাতে ঢাকার রাস্তায় ঘুরে ঘুরে আবদুল্লাহর সংসার চলছিল না।", "body": ["প্রতিদিন সকালে আবদুল্লাহ জ্যান্ত মুরগি মাথায় নিয়ে পুরান ঢাকায় ঘুরতেন, একটি ঝুড়ি বিক্রি করতে ঘণ্টার পর ঘণ্টা হাঁটতেন।", "জোগাড়ে সংগৃহীত অর্থ দিয়ে তিনি একটি ছোট রেফ্রিজারেটেড ভ্যান কেনেন এবং পাঁচটি রেস্তোরাঁর সঙ্গে সরবরাহ চুক্তি করেন।", "এখন তিনি আগের চেয়ে তিনগুণ আয় করেন — আর দিনে বিশ কিলোমিটার হাঁটতে হয় না।"]},
     name: "Abdullah",
     title: "Abdullah's Story",
     business: "Poultry supplier, Old Dhaka",
@@ -234,6 +97,7 @@ export const STORIES = [
   },
   {
     id: "nadia",
+    bn: {"title": "নাদিয়ার বেকারি", "business": "বেকারি, উত্তরা", "excerpt": "নাদিয়া একসময় পরিবার আর বন্ধুদের জন্য কেক বানাতেন। এখন উত্তরার অন্যতম জনপ্রিয় বেকারির মালিক তিনি।", "body": ["বেকিং নাদিয়ার কাছে সহজাত ছিল, কিন্তু ঘরের রান্নাঘর থেকে সেই প্রতিভাকে আয়ে পরিণত করার উপায় তাঁর ছিল না।", "তাঁর জোগাড় ক্যাম্পেইনের টাকায় একটি বাণিজ্যিক ওভেন ও ছোট একটি দোকান হয়। সমর্থকরা পুরস্কার হিসেবে পান তাঁর বিশেষ কেক।", "নাদিয়ার বেকারি এখন সারা ঢাকা থেকে বিয়ের অর্ডার নেয় এবং পাড়ার ছয়জন নারী সেখানে কাজ করেন।"]},
     name: "Nadia",
     title: "Nadia's Bakery",
     business: "Bakery, Uttara",
@@ -246,28 +110,5 @@ export const STORIES = [
       "Nadia's Bakery now takes wedding orders from across Dhaka and employs six women from her neighbourhood.",
     ],
     raised: 350000,
-  },
-];
-
-export const FAQS = [
-  {
-    q: "Who are we?",
-    a: "Jogaar is a crowdfunding platform for small businesses and aspiring entrepreneurs in Bangladesh. We connect people with an idea to people who want to help it happen.",
-  },
-  {
-    q: "How does it work?",
-    a: "A business owner creates a campaign with a funding goal and deadline. Supporters back the campaign with any amount. When the campaign ends, the owner receives the funds to build their business.",
-  },
-  {
-    q: "How can I contribute?",
-    a: "Create a free account, choose a campaign you believe in, and back it with any amount from ৳100. You can track everything you have backed from your dashboard.",
-  },
-  {
-    q: "Does it cost anything to start a campaign?",
-    a: "Starting a campaign is free. A small platform fee is taken only from campaigns that receive funds.",
-  },
-  {
-    q: "Which payment methods are supported?",
-    a: "bKash, Nagad and debit/credit cards. This demo build does not charge any real money.",
   },
 ];

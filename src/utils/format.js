@@ -1,11 +1,18 @@
 const DAY = 24 * 60 * 60 * 1000;
 
+// Set by the language switcher (UiContext). "bn" shows Bangla digits and month names.
+let locale = "en";
+export function setLocale(lang) {
+  locale = lang === "bn" ? "bn" : "en";
+}
+const numberLocale = () => (locale === "bn" ? "bn-BD" : "en-IN");
+
 export function formatTaka(amount) {
-  return `৳${Math.round(Number(amount) || 0).toLocaleString("en-IN")}`;
+  return `৳${Math.round(Number(amount) || 0).toLocaleString(numberLocale())}`;
 }
 
 export function formatNumber(n) {
-  return (Number(n) || 0).toLocaleString("en-IN");
+  return (Number(n) || 0).toLocaleString(numberLocale());
 }
 
 export function percentFunded(campaign) {
@@ -22,7 +29,7 @@ export function isEnded(campaign, now = Date.now()) {
 }
 
 export function formatDate(ts) {
-  return new Date(ts).toLocaleDateString("en-GB", {
+  return new Date(ts).toLocaleDateString(locale === "bn" ? "bn-BD" : "en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",

@@ -1,27 +1,25 @@
 import React, { useState } from "react";
 import { HiPlus, HiMinus } from "react-icons/hi";
-import { FAQS } from "../data/seed";
+import { useUi } from "../context/UiContext";
+
+const ITEMS = [1, 2, 3, 4, 5];
 
 export default function Faq() {
-  const [open, setOpen] = useState(0);
+  const { t } = useUi();
+  const [open, setOpen] = useState(1);
   return (
     <div className="faq">
-      {FAQS.map((item, i) => {
-        const isOpen = open === i;
+      {ITEMS.map((n) => {
+        const isOpen = open === n;
         return (
-          <div key={item.q} className={`faq__item ${isOpen ? "is-open" : ""}`}>
-            <button
-              className="faq__q"
-              aria-expanded={isOpen}
-              aria-controls={`faq-${i}`}
-              onClick={() => setOpen(isOpen ? -1 : i)}
-            >
-              {item.q}
+          <div key={n} className={`faq__item ${isOpen ? "is-open" : ""}`}>
+            <button className="faq__q" aria-expanded={isOpen} aria-controls={`faq-${n}`} onClick={() => setOpen(isOpen ? 0 : n)}>
+              {t(`faq.q${n}`)}
               {isOpen ? <HiMinus /> : <HiPlus />}
             </button>
             {isOpen && (
-              <p id={`faq-${i}`} className="faq__a">
-                {item.a}
+              <p id={`faq-${n}`} className="faq__a">
+                {t(`faq.a${n}`)}
               </p>
             )}
           </div>

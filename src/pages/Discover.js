@@ -2,23 +2,25 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useHistory, useLocation } from "react-router-dom";
 import { HiSearch } from "react-icons/hi";
 import CampaignCard from "../components/CampaignCard";
-import { useDocumentTitle } from "../components/common";
+import { Alert, useDocumentTitle } from "../components/common";
 import { CardGridSkeleton } from "../components/Skeleton";
 import { listCampaigns } from "../api/client";
+import { useUi } from "../context/UiContext";
 import { CATEGORIES } from "../data/seed";
-import { isEnded, percentFunded } from "../utils/format";
+import { formatNumber, isEnded, percentFunded } from "../utils/format";
 
 const PAGE_SIZE = 6;
 
 const SORTS = {
-  trending: { label: "Most backers", fn: (a, b) => b.backers - a.backers },
-  funded: { label: "Most funded", fn: (a, b) => percentFunded(b) - percentFunded(a) },
-  ending: { label: "Ending soon", fn: (a, b) => a.endsAt - b.endsAt },
-  newest: { label: "Newest", fn: (a, b) => b.createdAt - a.createdAt },
+  trending: (a, b) => b.backers - a.backers,
+  funded: (a, b) => percentFunded(b) - percentFunded(a),
+  ending: (a, b) => a.endsAt - b.endsAt,
+  newest: (a, b) => b.createdAt - a.createdAt,
 };
 
 export default function Discover() {
-  useDocumentTitle("Discover campaigns");
+  const { t, tErr } = useUi();
+  useDocumentTitle(t("discover.title"));
   const location = useLocation();
   const history = useHistory();
   const params = new URLSearchParams(location.search);
@@ -28,10 +30,17 @@ export default function Discover() {
   const [sort, setSort] = useState("trending");
   const [showEnded, setShowEnded] = useState(false);
   const [campaigns, setCampaigns] = useState(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let alive = true;
-    listCampaigns().then((c) => alive && setCampaigns(c));
+    listCampaigns()
+      .then((c) => alive && setCampaigns(c))
+      .catch((err) => {
+        if (!alive) return;
+        setCampaigns([]);
+        setError(err.message);
+      });
     return () => {
       alive = false;
     };
@@ -62,20 +71,20 @@ export default function Discover() {
       .filter(
         (c) =>
           !q ||
-          [c.title, c.summary, c.location, c.ownerName, c.category]
+          [c.title, c.summary, c.location, c.ownerName, c.category, t(`category.${c.category}`)]
             .join(" ")
             .toLowerCase()
             .includes(q)
       )
-      .sort(SORTS[sort].fn);
-  }, [campaigns, query, category, sort, showEnded]);
+      .sort(SORTS[sort]);
+  }, [campaigns, query, category, sort, showEnded, t]);
 
   return (
     <div className="page container">
       <header className="page__head">
-        <span className="eyebrow">Discover</span>
-        <h1>Back a local business</h1>
-        <p className="muted">Every contribution helps a real entrepreneur in Bangladesh.</p>
+        <span className="eyebrow">{t("discover.eyebrow")}</span>
+        <h1>{t("discover.title")}</h1>
+        <p className="muted">{t("discover.lead")}</p>
       </header>
 
       <div className="toolbar">
@@ -83,8 +92,8 @@ export default function Discover() {
           <HiSearch aria-hidden="true" />
           <input
             type="search"
-            placeholder="Search by name, place or owner"
-            aria-label="Search campaigns"
+            placeholder={t("discover.search")}
+            aria-label={t("discover.searchLabel")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -92,17 +101,24 @@ export default function Discover() {
         <div className="toolbar__right">
           <label className="checkbox">
             <input type="checkbox" checked={showEnded} onChange={(e) => setShowEnded(e.target.checked)} />
-            Show ended
+            {t("discover.showEnded")}
           </label>
-          <select className="input input--sm" aria-label="Sort campaigns" value={sort} onChange={(e) => setSort(e.target.value)}>
-            {Object.entries(SORTS).map(([key, s]) => (
-              <option key={key} value={key}>{s.label}</option>
+          <select
+            className="input input--sm"
+            aria-label={t("discover.sortLabel")}
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+          >
+            {Object.keys(SORTS).map((key) => (
+              <option key={key} value={key}>
+                {t(`discover.sort.${key}`)}
+              </option>
             ))}
           </select>
         </div>
       </div>
 
-      <div className="category-row category-row--left" role="tablist" aria-label="Categories">
+      <div className="category-row category-row--left" role="tablist" aria-label={t("discover.categories")}>
         {["All", ...CATEGORIES].map((cat) => (
           <button
             key={cat}
@@ -111,17 +127,22 @@ export default function Discover() {
             className={`chip chip--link ${category === cat ? "is-active" : ""}`}
             onClick={() => setCategory(cat)}
           >
-            {cat}
+            {cat === "All" ? t("discover.all") : t(`category.${cat}`)}
           </button>
         ))}
       </div>
+
+      <Alert>{error && tErr(error)}</Alert>
 
       {!campaigns ? (
         <CardGridSkeleton count={6} />
       ) : results.length ? (
         <>
           <p className="muted small">
-            Showing {Math.min(limit, results.length)} of {results.length} campaign{results.length === 1 ? "" : "s"}
+            {t("discover.showing", {
+              shown: formatNumber(Math.min(limit, results.length)),
+              total: formatNumber(results.length),
+            })}
           </p>
           <div className="grid grid--3">
             {results.slice(0, limit).map((c) => (
@@ -131,17 +152,23 @@ export default function Discover() {
           {results.length > limit && (
             <div className="load-more">
               <button className="btn btn--outline" onClick={() => setLimit((l) => l + PAGE_SIZE)}>
-                Load more ({results.length - limit} more)
+                {t("discover.loadMore", { n: formatNumber(results.length - limit) })}
               </button>
             </div>
           )}
         </>
       ) : (
         <div className="empty">
-          <h3>No campaigns match your search</h3>
-          <p className="muted">Try a different keyword or category.</p>
-          <button className="btn btn--outline" onClick={() => { setQuery(""); setCategory("All"); }}>
-            Clear filters
+          <h3>{t("discover.emptyTitle")}</h3>
+          <p className="muted">{t("discover.emptyText")}</p>
+          <button
+            className="btn btn--outline"
+            onClick={() => {
+              setQuery("");
+              setCategory("All");
+            }}
+          >
+            {t("discover.clear")}
           </button>
         </div>
       )}
