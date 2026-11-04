@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useUi } from "../context/UiContext";
 import { initials } from "../utils/format";
 import Logo from "./Logo";
+import NotificationBell from "./NotificationBell";
 
 const LINKS = [
   { to: "/discover", key: "nav.discover" },
@@ -95,6 +96,7 @@ export default function Navbar() {
             >
               {resolvedTheme === "dark" ? <HiSun size={20} /> : <HiMoon size={20} />}
             </button>
+            {user && <NotificationBell />}
             <Link to="/start" className="btn btn--outline btn--sm">
               {t("nav.start")}
             </Link>
@@ -117,6 +119,7 @@ export default function Navbar() {
                       <span>{user.email}</span>
                     </div>
                     <Link role="menuitem" to="/dashboard">{t("nav.dashboard")}</Link>
+                    {user.isAdmin && <Link role="menuitem" to="/admin">{t("nav.admin")}</Link>}
                     <Link role="menuitem" to="/dashboard?tab=pledges">{t("nav.myContributions")}</Link>
                     <Link role="menuitem" to="/dashboard?tab=saved">{t("nav.saved")}</Link>
                     <Link role="menuitem" to="/dashboard?tab=settings">{t("nav.editProfile")}</Link>

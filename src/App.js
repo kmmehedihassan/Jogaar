@@ -11,6 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import { Login, Register } from "./pages/Auth";
 import { HowItWorks, Stories } from "./pages/Info";
 import NotFound from "./pages/NotFound";
+import Admin from "./pages/Admin";
 
 export default function App() {
   const { pathname } = useLocation();
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="/register" component={Register} />
           <ProtectedRoute path="/start" component={StartCampaign} />
           <ProtectedRoute path="/dashboard" component={Dashboard} />
+          <ProtectedRoute path="/admin" component={Admin} />
           <Route component={NotFound} />
         </Switch>
       </main>

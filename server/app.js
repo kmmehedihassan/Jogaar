@@ -15,6 +15,7 @@ const DURATIONS = [15, 30, 45, 60];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const PASSWORD_RE = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
 const MAX_IMAGE_CHARS = 1_500_000; // ~1.1 MB once decoded
+const REPORT_REASONS = ["spam", "fraud", "offensive", "other"];
 
 class HttpError extends Error {
   constructor(status, message, field) {
@@ -63,7 +64,17 @@ function createLimiter({ max, windowMs }) {
   };
 }
 
-function createApp(db) {
+/**
+ * @param db       better-sqlite3 database from openDb()
+ * @param options  { adminEmails: string[] } — accounts with these emails are admins
+ */
+function createApp(db, options = {}) {
+  const adminEmails = new Set(
+    (options.adminEmails || (process.env.ADMIN_EMAILS || "").split(","))
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean)
+  );
+  const isAdmin = (u) => Boolean(u && adminEmails.has(u.email));
   const api = express.Router();
   api.use(express.json({ limit: "3mb" }));
   const loginLimiter = createLimiter({ max: 10, windowMs: 15 * 60 * 1000 });
@@ -91,6 +102,7 @@ function createApp(db) {
     email: u.email,
     contact: u.contact,
     bio: u.bio,
+    isAdmin: isAdmin(u),
     createdAt: u.created_at,
   });
 
@@ -109,6 +121,8 @@ function createApp(db) {
       goal: row.goal,
       raised: row.raised,
       backers: row.backers,
+      verified: Boolean(row.verified),
+      hidden: Boolean(row.hidden),
       rewards: JSON.parse(row.rewards).map((r) => ({ ...r, claimed: claimed[r.id] || 0 })),
       updates: q.updates.all(row.id).map((u) => ({ id: u.id, title: u.title, body: u.body, createdAt: u.created_at })),
       createdAt: row.created_at,
@@ -156,6 +170,22 @@ function createApp(db) {
     return token;
   }
 
+  /** The signed-in user, or null (for routes that work either way). */
+  function optionalUser(req) {
+    const header = req.get("authorization") || "";
+    if (!header.startsWith("Bearer ")) return null;
+    const session = q.session.get(sha256(header.slice(7)), Date.now());
+    return (session && q.userById.get(session.user_id)) || null;
+  }
+
+  const insertNotification = db.prepare(`INSERT INTO notifications
+    (id, user_id, type, campaign_id, campaign_title, actor_name, amount, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+  function notify(userId, type, row, actorName = "", amount = null) {
+    if (!userId) return;
+    insertNotification.run(randomId(8), userId, type, row.id, row.title, actorName, amount, Date.now());
+  }
+
   function auth(req) {
     const header = req.get("authorization") || "";
     const token = header.startsWith("Bearer ") ? header.slice(7) : "";
@@ -166,14 +196,18 @@ function createApp(db) {
     return user;
   }
 
-  function findCampaign(id) {
+  function findCampaign(id, viewer) {
     const row = q.campaign.get(id);
     if (!row) fail(404, "This campaign no longer exists.");
+    // Hidden campaigns are only visible to their owner and admins.
+    if (row.hidden && !(viewer && (viewer.id === row.owner_id || isAdmin(viewer)))) {
+      fail(404, "This campaign no longer exists.");
+    }
     return row;
   }
 
   function ownCampaign(user, id) {
-    const row = findCampaign(id);
+    const row = findCampaign(id, user);
     if (row.owner_id !== user.id) fail(403, "Only the campaign owner can do that.");
     return row;
   }
@@ -351,13 +385,13 @@ function createApp(db) {
 
   api.get(
     "/campaigns",
-    h(async (req, res) => res.json(presentAll(q.campaigns.all())))
+    h(async (req, res) => res.json(presentAll(q.campaigns.all().filter((r) => !r.hidden))))
   );
 
   api.get(
     "/campaigns/:id",
     h(async (req, res) => {
-      const row = findCampaign(req.params.id);
+      const row = findCampaign(req.params.id, optionalUser(req));
       const pledges = db
         .prepare("SELECT * FROM pledges WHERE campaign_id = ? ORDER BY created_at DESC LIMIT 100")
         .all(row.id)
@@ -435,13 +469,17 @@ function createApp(db) {
       const title = str(req.body.title).slice(0, 80);
       const body = str(req.body.body).slice(0, 1000);
       if (title.length < 3 || body.length < 10) fail(400, "Add a title and a few sentences for your backers.");
-      db.prepare("INSERT INTO updates (id, campaign_id, title, body, created_at) VALUES (?, ?, ?, ?, ?)").run(
-        randomId(6),
-        row.id,
-        title,
-        body,
-        Date.now()
-      );
+      db.transaction(() => {
+        db.prepare("INSERT INTO updates (id, campaign_id, title, body, created_at) VALUES (?, ?, ?, ?, ?)").run(
+          randomId(6),
+          row.id,
+          title,
+          body,
+          Date.now()
+        );
+        const backerIds = db.prepare("SELECT DISTINCT user_id FROM pledges WHERE campaign_id = ?").all(row.id);
+        for (const b of backerIds) notify(b.user_id, "update", row, row.owner_name);
+      })();
       res.status(201).json(presentCampaign(q.campaign.get(row.id)));
     })
   );
@@ -456,7 +494,8 @@ function createApp(db) {
       const method = METHODS.includes(req.body.method) ? req.body.method : fail(400, "Choose a payment method.", "method");
 
       const pledge = db.transaction(() => {
-        const row = findCampaign(req.params.id);
+        const row = findCampaign(req.params.id, user);
+        if (row.hidden) fail(409, "This campaign is under review.");
         if (row.ends_at <= Date.now()) fail(409, "This campaign has ended.");
         if (row.owner_id === user.id) fail(403, "You can't back your own campaign.");
         let reward = null;
@@ -489,6 +528,7 @@ function createApp(db) {
           repeat ? 0 : 1,
           row.id
         );
+        notify(row.owner_id, "pledge", row, record.user_name, amount);
         return record;
       })();
 
@@ -502,7 +542,7 @@ function createApp(db) {
     "/campaigns/:id/comments",
     h(async (req, res) => {
       const user = auth(req);
-      const row = findCampaign(req.params.id);
+      const row = findCampaign(req.params.id, user);
       const body = str(req.body.body).slice(0, 1000);
       if (body.length < 2) fail(400, "Write a comment first.", "body");
       const comment = {
@@ -516,6 +556,7 @@ function createApp(db) {
       };
       db.prepare(`INSERT INTO comments (id, campaign_id, user_id, user_name, is_owner, body, created_at)
         VALUES (@id, @campaign_id, @user_id, @user_name, @is_owner, @body, @created_at)`).run(comment);
+      if (row.owner_id !== user.id) notify(row.owner_id, "comment", row, user.name);
       res.status(201).json(presentComment(comment));
     })
   );
@@ -527,7 +568,7 @@ function createApp(db) {
       const comment = db.prepare("SELECT * FROM comments WHERE id = ?").get(req.params.id);
       if (comment) {
         const row = q.campaign.get(comment.campaign_id);
-        if (comment.user_id !== user.id && !(row && row.owner_id === user.id))
+        if (comment.user_id !== user.id && !(row && row.owner_id === user.id) && !isAdmin(user))
           fail(403, "You can only delete your own comments.");
         db.prepare("DELETE FROM comments WHERE id = ?").run(comment.id);
       }
@@ -552,7 +593,7 @@ function createApp(db) {
     "/me/saved/:id",
     h(async (req, res) => {
       const user = auth(req);
-      const row = findCampaign(req.params.id);
+      const row = findCampaign(req.params.id, user);
       const existing = db.prepare("SELECT 1 FROM saved WHERE user_id = ? AND campaign_id = ?").get(user.id, row.id);
       if (existing) db.prepare("DELETE FROM saved WHERE user_id = ? AND campaign_id = ?").run(user.id, row.id);
       else db.prepare("INSERT INTO saved (user_id, campaign_id, created_at) VALUES (?, ?, ?)").run(user.id, row.id, Date.now());
@@ -577,11 +618,181 @@ function createApp(db) {
       const saved = presentAll(
         db
           .prepare(
-            "SELECT c.* FROM saved s JOIN campaigns c ON c.id = s.campaign_id WHERE s.user_id = ? ORDER BY s.created_at DESC"
+            "SELECT c.* FROM saved s JOIN campaigns c ON c.id = s.campaign_id WHERE s.user_id = ? AND c.hidden = 0 ORDER BY s.created_at DESC"
           )
           .all(user.id)
       );
       res.json({ myCampaigns, myPledges, saved });
+    })
+  );
+
+  /* ---------------------------- notifications --------------------------- */
+
+  api.get(
+    "/me/notifications",
+    h(async (req, res) => {
+      const user = auth(req);
+      const items = db
+        .prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 30")
+        .all(user.id)
+        .map((n) => ({
+          id: n.id,
+          type: n.type,
+          campaignId: n.campaign_id,
+          campaignTitle: n.campaign_title,
+          actorName: n.actor_name,
+          amount: n.amount,
+          read: Boolean(n.read_at),
+          createdAt: n.created_at,
+        }));
+      const unread = db
+        .prepare("SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL")
+        .get(user.id).n;
+      res.json({ items, unread });
+    })
+  );
+
+  api.post(
+    "/me/notifications/read",
+    h(async (req, res) => {
+      const user = auth(req);
+      db.prepare("UPDATE notifications SET read_at = ? WHERE user_id = ? AND read_at IS NULL").run(Date.now(), user.id);
+      res.status(204).end();
+    })
+  );
+
+  /* ------------------------------- reports ------------------------------ */
+
+  api.post(
+    "/reports",
+    h(async (req, res) => {
+      const user = auth(req);
+      const targetType = req.body.targetType;
+      const reason = req.body.reason;
+      if (!["campaign", "comment"].includes(targetType)) fail(400, "Invalid request.");
+      if (!REPORT_REASONS.includes(reason)) fail(400, "Choose a reason.", "reason");
+      let campaignId;
+      if (targetType === "campaign") {
+        campaignId = findCampaign(String(req.body.targetId || ""), user).id;
+      } else {
+        const comment = db.prepare("SELECT * FROM comments WHERE id = ?").get(String(req.body.targetId || ""));
+        if (!comment) fail(404, "That comment no longer exists.");
+        campaignId = comment.campaign_id;
+      }
+      const targetId = targetType === "campaign" ? campaignId : String(req.body.targetId);
+      const existing = db
+        .prepare("SELECT 1 FROM reports WHERE user_id = ? AND target_type = ? AND target_id = ? AND resolved_at IS NULL")
+        .get(user.id, targetType, targetId);
+      if (!existing) {
+        db.prepare(`INSERT INTO reports (id, target_type, target_id, campaign_id, user_id, reason, details, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+          randomId(8),
+          targetType,
+          targetId,
+          campaignId,
+          user.id,
+          reason,
+          str(req.body.details).slice(0, 300),
+          Date.now()
+        );
+      }
+      res.status(201).json({ ok: true });
+    })
+  );
+
+  /* -------------------------------- admin ------------------------------- */
+
+  function requireAdmin(req) {
+    const user = auth(req);
+    if (!isAdmin(user)) fail(403, "Only admins can do that.");
+    return user;
+  }
+
+  api.get(
+    "/admin/overview",
+    h(async (req, res) => {
+      requireAdmin(req);
+      const count = (sql) => db.prepare(sql).get().n;
+      const reports = db
+        .prepare(
+          `SELECT r.*, u.name AS reporter_name, c.title AS campaign_title, m.body AS comment_body, m.user_name AS comment_author
+           FROM reports r
+           JOIN users u ON u.id = r.user_id
+           LEFT JOIN campaigns c ON c.id = r.campaign_id
+           LEFT JOIN comments m ON r.target_type = 'comment' AND m.id = r.target_id
+           WHERE r.resolved_at IS NULL
+           ORDER BY r.created_at DESC`
+        )
+        .all()
+        .map((r) => ({
+          id: r.id,
+          targetType: r.target_type,
+          targetId: r.target_id,
+          campaignId: r.campaign_id,
+          campaignTitle: r.campaign_title,
+          commentBody: r.comment_body,
+          commentAuthor: r.comment_author,
+          reason: r.reason,
+          details: r.details,
+          reporterName: r.reporter_name,
+          createdAt: r.created_at,
+        }));
+      res.json({
+        stats: {
+          users: count("SELECT COUNT(*) AS n FROM users"),
+          campaigns: count("SELECT COUNT(*) AS n FROM campaigns"),
+          pledges: count("SELECT COUNT(*) AS n FROM pledges"),
+          raised: count("SELECT COALESCE(SUM(amount), 0) AS n FROM pledges"),
+          openReports: reports.length,
+        },
+        campaigns: presentAll(q.campaigns.all()),
+        reports,
+      });
+    })
+  );
+
+  api.patch(
+    "/admin/campaigns/:id",
+    h(async (req, res) => {
+      requireAdmin(req);
+      const row = q.campaign.get(req.params.id);
+      if (!row) fail(404, "This campaign no longer exists.");
+      const verified = typeof req.body.verified === "boolean" ? req.body.verified : Boolean(row.verified);
+      const hidden = typeof req.body.hidden === "boolean" ? req.body.hidden : Boolean(row.hidden);
+      db.prepare("UPDATE campaigns SET verified = ?, hidden = ? WHERE id = ?").run(verified ? 1 : 0, hidden ? 1 : 0, row.id);
+      if (verified && !row.verified) notify(row.owner_id, "verified", row);
+      if (hidden && !row.hidden) notify(row.owner_id, "hidden", row);
+      res.json(presentCampaign(q.campaign.get(row.id)));
+    })
+  );
+
+  api.post(
+    "/admin/reports/:id/resolve",
+    h(async (req, res) => {
+      requireAdmin(req);
+      const report = db.prepare("SELECT * FROM reports WHERE id = ?").get(req.params.id);
+      if (!report) fail(404, "That report no longer exists.");
+      const action = req.body.action === "remove" ? "remove" : "dismiss";
+      db.transaction(() => {
+        if (action === "remove") {
+          if (report.target_type === "comment") {
+            db.prepare("DELETE FROM comments WHERE id = ?").run(report.target_id);
+          } else {
+            const row = q.campaign.get(report.target_id);
+            if (row && !row.hidden) {
+              db.prepare("UPDATE campaigns SET hidden = 1 WHERE id = ?").run(row.id);
+              notify(row.owner_id, "hidden", row);
+            }
+          }
+        }
+        // Resolve every open report about the same thing.
+        db.prepare("UPDATE reports SET resolved_at = ? WHERE target_type = ? AND target_id = ? AND resolved_at IS NULL").run(
+          Date.now(),
+          report.target_type,
+          report.target_id
+        );
+      })();
+      res.status(204).end();
     })
   );
 

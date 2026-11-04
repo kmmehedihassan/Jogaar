@@ -47,8 +47,8 @@ export const updateProfile = (token, data) => request("/auth/me", { method: "PAT
 export const changePassword = (token, data) => request("/auth/password", { method: "POST", token, body: data });
 
 export const listCampaigns = () => request("/campaigns");
-export const getCampaign = (id) =>
-  request(`/campaigns/${enc(id)}`).catch((err) => {
+export const getCampaign = (id, token) =>
+  request(`/campaigns/${enc(id)}`, { token }).catch((err) => {
     if (err.status === 404) return null;
     throw err;
   });
@@ -68,5 +68,14 @@ export const deleteComment = (token, commentId) =>
 export const getSavedIds = (token) => request("/me/saved", { token });
 export const toggleSaved = (token, id) => request(`/me/saved/${enc(id)}`, { method: "POST", token });
 export const getDashboard = (token) => request("/me/dashboard", { token });
+
+export const getNotifications = (token) => request("/me/notifications", { token });
+export const markNotificationsRead = (token) => request("/me/notifications/read", { method: "POST", token });
+export const report = (token, data) => request("/reports", { method: "POST", token, body: data });
+export const getAdminOverview = (token) => request("/admin/overview", { token });
+export const adminUpdateCampaign = (token, id, data) =>
+  request(`/admin/campaigns/${enc(id)}`, { method: "PATCH", token, body: data });
+export const resolveReport = (token, id, action) =>
+  request(`/admin/reports/${enc(id)}/resolve`, { method: "POST", token, body: { action } });
 
 export function resetLocalData() {}

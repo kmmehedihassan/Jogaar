@@ -11,6 +11,8 @@ Jogaar is a crowdfunding platform for small businesses and aspiring entrepreneur
 - **Comments**: signed-in users can comment; owners get a "Creator" badge and can remove comments on their campaign.
 - **Owner tools**: start, edit and delete (if unfunded) campaigns, and post updates for backers.
 - **Accounts**: sign up, log in, change password, profile settings, saved campaigns and a dashboard.
+- **Notifications**: a bell in the navbar tells owners about new contributions and comments, backers about campaign updates, and owners when their campaign is verified or hidden.
+- **Reporting and moderation**: anyone signed in can report a campaign or comment. Admins get an admin page to review reports, remove comments, hide campaigns and mark campaigns as verified (shown with a blue badge).
 - **Bangla and English**: switch language from the navbar; numbers and dates use Bangla digits.
 - **Dark mode**, notifications, loading placeholders, and a responsive layout for phone, tablet and desktop.
 
@@ -43,6 +45,21 @@ The database is created at `server/data/jogaar.db` with the sample campaigns on 
 | ----------- | ----------------------- | ------------------------------ |
 | `PORT`      | `4000`                  | Port the server listens on     |
 | `JOGAAR_DB` | `server/data/jogaar.db` | Path to the SQLite file        |
+| `ADMIN_EMAILS` | _(none)_             | Comma-separated emails of admin accounts, e.g. `you@example.com` |
+
+Admins see an **Admin** link in their account menu. In the browser-only mode (Option 1), the first account created in a browser is the admin, so you can try the admin tools without a server.
+
+### Option 3 — Docker
+
+```bash
+docker build -t jogaar .
+```
+
+```bash
+docker run -p 4000:4000 -v jogaar-data:/app/server/data -e ADMIN_EMAILS=you@example.com jogaar
+```
+
+The `jogaar-data` volume keeps the database between restarts.
 
 **While developing**, run the server and the React dev server side by side:
 
@@ -64,6 +81,8 @@ The dev server forwards `/api` requests to port 4000.
 npm test             # website tests
 npm run test:server  # API tests
 ```
+
+GitHub Actions (`.github/workflows/ci.yml`) runs both test suites and a production build on every pull request and on every push to `master`.
 
 ## Security notes
 

@@ -9,7 +9,11 @@ import {
   HiTrash,
   HiSpeakerphone,
   HiGift,
+  HiFlag,
+  HiBadgeCheck,
+  HiEyeOff,
 } from "react-icons/hi";
+import ReportDialog from "../components/ReportDialog";
 import ProgressBar from "../components/ProgressBar";
 import { SaveButton, ShareButton } from "../components/CampaignActions";
 import { Alert, Field, Spinner, useDocumentTitle } from "../components/common";
@@ -298,7 +302,7 @@ function UpdateForm({ campaign, onPosted }) {
   );
 }
 
-function Comments({ campaign, comments, setComments }) {
+function Comments({ campaign, comments, setComments, onReport }) {
   const { user, token } = useAuth();
   const { toast, t, tErr } = useUi();
   const location = useLocation();
@@ -379,6 +383,11 @@ function Comments({ campaign, comments, setComments }) {
                   <strong>{c.userName}</strong>
                   {c.isOwner && <span className="badge-creator">{t("comments.creator")}</span>}
                   <span className="muted small">{formatDate(c.createdAt)}</span>
+                  {user && c.userId !== user.id && (
+                    <button className="icon-link icon-link--flag" onClick={() => onReport("comment", c.id)} aria-label={t("comments.report")} title={t("comments.report")}>
+                      <HiFlag />
+                    </button>
+                  )}
                   {canDelete(c) && (
                     <button className="icon-link" onClick={() => remove(c)} aria-label={t("comments.delete")} title={t("comments.delete")}>
                       <HiTrash />
@@ -404,19 +413,20 @@ export default function CampaignDetail() {
   const history = useHistory();
   const [data, setData] = useState(undefined);
   const [tab, setTab] = useState("story");
+  const [reporting, setReporting] = useState(null);
   useDocumentTitle(data && data.campaign ? data.campaign.title : t("detail.back"));
 
   useEffect(() => {
     let alive = true;
     setData(undefined);
     setTab("story");
-    getCampaign(id)
+    getCampaign(id, token)
       .then((d) => alive && setData(d))
       .catch(() => alive && setData(null));
     return () => {
       alive = false;
     };
-  }, [id]);
+  }, [id, token]);
 
   if (data === undefined) return <div className="page"><Spinner /></div>;
   if (data === null) return <NotFound />;
@@ -462,8 +472,18 @@ export default function CampaignDetail() {
       <header className="detail__head">
         <div className="detail__titlebar">
           <h1>{campaign.title}</h1>
+          {campaign.verified && (
+            <span className="badge-verified">
+              <HiBadgeCheck /> {t("card.verified")}
+            </span>
+          )}
           {pct >= 100 && <span className="badge-funded badge-funded--inline">{t("card.badgeFunded")}</span>}
         </div>
+        {campaign.hidden && (
+          <Alert type="info">
+            <HiEyeOff aria-hidden="true" /> {t("detail.hiddenNotice")}
+          </Alert>
+        )}
         <p className="lead muted">{campaign.summary}</p>
         <div className="meta-row">
           <span>
@@ -480,6 +500,11 @@ export default function CampaignDetail() {
         <div className="detail__actions">
           <SaveButton campaignId={campaign.id} variant="button" />
           <ShareButton title={campaign.title} />
+          {user && !isOwner && (
+            <button className="btn btn--outline btn--sm" onClick={() => setReporting({ type: "campaign", id: campaign.id })}>
+              <HiFlag /> {t("report.button")}
+            </button>
+          )}
           {isOwner && (
             <>
               <Link to={`/campaigns/${campaign.id}/edit`} className="btn btn--outline btn--sm">
@@ -575,7 +600,14 @@ export default function CampaignDetail() {
             </section>
           )}
 
-          {tab === "comments" && <Comments campaign={campaign} comments={comments} setComments={setComments} />}
+          {tab === "comments" && (
+            <Comments
+              campaign={campaign}
+              comments={comments}
+              setComments={setComments}
+              onReport={(type, targetId) => setReporting({ type, id: targetId })}
+            />
+          )}
 
           {tab === "backers" && (
             <section>
@@ -603,6 +635,7 @@ export default function CampaignDetail() {
           )}
         </div>
       </div>
+      {reporting && <ReportDialog targetType={reporting.type} targetId={reporting.id} onClose={() => setReporting(null)} />}
     </div>
   );
 }
