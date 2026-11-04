@@ -2,7 +2,9 @@ import React, { useEffect, useState } from "react";
 import { Link, useHistory, useLocation } from "react-router-dom";
 import { Alert, Field, Spinner, useDocumentTitle } from "../components/common";
 import ProgressBar from "../components/ProgressBar";
-import { getDashboard, USING_REMOTE_AUTH } from "../api/client";
+import CampaignCard from "../components/CampaignCard";
+import { changePassword, getDashboard, resetLocalData, USING_REMOTE_AUTH } from "../api/client";
+import { useUi } from "../context/UiContext";
 import { useAuth } from "../context/AuthContext";
 import {
   campaignImage,
@@ -18,6 +20,7 @@ const TABS = [
   { id: "overview", label: "Overview" },
   { id: "campaigns", label: "My campaigns" },
   { id: "pledges", label: "Contributions" },
+  { id: "saved", label: "Saved" },
   { id: "settings", label: "Profile settings" },
 ];
 
@@ -59,8 +62,76 @@ function PledgeRow({ p }) {
   );
 }
 
+const PASSWORD_RE = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
+
+function PasswordForm() {
+  const { token } = useAuth();
+  const { toast } = useUi();
+  const [v, setV] = useState({ current: "", next: "", confirm: "" });
+  const [errors, setErrors] = useState({});
+  const [busy, setBusy] = useState(false);
+  const onChange = (e) => setV({ ...v, [e.target.name]: e.target.value });
+
+  const submit = async (e) => {
+    e.preventDefault();
+    const found = {};
+    if (!v.current) found.current = "Enter your current password.";
+    if (!PASSWORD_RE.test(v.next))
+      found.next = "Use at least 8 characters with an uppercase letter, a lowercase letter and a number.";
+    else if (v.next === v.current) found.next = "Choose a password you haven't used here.";
+    if (v.confirm !== v.next) found.confirm = "Passwords do not match.";
+    setErrors(found);
+    if (Object.keys(found).length) return;
+    setBusy(true);
+    try {
+      await changePassword(token, { current: v.current, next: v.next });
+      setV({ current: "", next: "", confirm: "" });
+      toast("Password changed.");
+    } catch (err) {
+      setErrors(err.field ? { [err.field]: err.message } : { form: err.message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form className="card form-card" onSubmit={submit} noValidate>
+      <h2 className="form-card__title">Change password</h2>
+      <Field label="Current password" name="current" type="password" autoComplete="current-password" value={v.current} onChange={onChange} error={errors.current} />
+      <Field label="New password" name="next" type="password" autoComplete="new-password" value={v.next} onChange={onChange} error={errors.next} />
+      <Field label="Confirm new password" name="confirm" type="password" autoComplete="new-password" value={v.confirm} onChange={onChange} error={errors.confirm} />
+      <Alert>{errors.form}</Alert>
+      <button className="btn btn--primary" disabled={busy || USING_REMOTE_AUTH}>
+        {busy ? "Saving…" : "Change password"}
+      </button>
+    </form>
+  );
+}
+
+function DangerZone() {
+  const { logout } = useAuth();
+  const onReset = async () => {
+    if (!window.confirm("Delete all Jogaar data stored in this browser, including every account? This can't be undone.")) return;
+    await logout();
+    resetLocalData();
+    window.location.assign("/");
+  };
+  if (USING_REMOTE_AUTH) return null;
+  return (
+    <div className="card form-card danger-zone">
+      <h2 className="form-card__title">Reset demo data</h2>
+      <p className="muted">
+        In this demo, accounts, campaigns and contributions are stored only in this browser.
+        Resetting restores the original sample campaigns.
+      </p>
+      <button className="btn btn--outline btn--danger" onClick={onReset}>Reset all local data</button>
+    </div>
+  );
+}
+
 function Settings() {
   const { user, updateProfile } = useAuth();
+  const { toast } = useUi();
   const [values, setValues] = useState({ name: user.name, contact: user.contact, bio: user.bio });
   const [status, setStatus] = useState({ type: "", msg: "" });
   const [busy, setBusy] = useState(false);
@@ -75,7 +146,8 @@ function Settings() {
     setBusy(true);
     try {
       await updateProfile(values);
-      setStatus({ type: "success", msg: "Profile saved." });
+      setStatus({ type: "", msg: "" });
+      toast("Profile saved.");
     } catch (err) {
       setStatus({ type: "error", msg: err.message });
     } finally {
@@ -85,6 +157,7 @@ function Settings() {
 
   return (
     <form className="card form-card" onSubmit={submit} noValidate>
+      <h2 className="form-card__title">Profile</h2>
       <Field label="Email" name="email" value={user.email} disabled hint="Email can't be changed." />
       <Field label="Full name" name="name" value={values.name} onChange={onChange} />
       <Field label="Phone" name="contact" type="tel" value={values.contact} onChange={onChange} />
@@ -111,7 +184,7 @@ export default function Dashboard() {
     return () => {
       alive = false;
     };
-  }, [user]);
+  }, [user, tab]);
 
   const setTab = (id) => history.replace({ search: id === "overview" ? "" : `?tab=${id}` });
   const totalGiven = data ? data.myPledges.reduce((s, p) => s + p.amount, 0) : 0;
@@ -140,7 +213,23 @@ export default function Dashboard() {
       {!data ? (
         <Spinner />
       ) : tab === "settings" ? (
-        <Settings />
+        <div className="settings-grid">
+          <Settings />
+          <div className="stack stack--lg">
+            <PasswordForm />
+            <DangerZone />
+          </div>
+        </div>
+      ) : tab === "saved" ? (
+        data.saved.length ? (
+          <div className="grid grid--3">{data.saved.map((c) => <CampaignCard key={c.id} campaign={c} />)}</div>
+        ) : (
+          <div className="empty">
+            <h3>No saved campaigns</h3>
+            <p className="muted">Tap the heart on any campaign to keep track of it here.</p>
+            <Link to="/discover" className="btn btn--primary">Discover campaigns</Link>
+          </div>
+        )
       ) : tab === "campaigns" ? (
         data.myCampaigns.length ? (
           <div className="stack">{data.myCampaigns.map((c) => <CampaignRow key={c.id} c={c} />)}</div>
@@ -166,7 +255,7 @@ export default function Dashboard() {
           <div className="kpis">
             <div className="card kpi"><span>Total contributed</span><strong>{formatTaka(totalGiven)}</strong></div>
             <div className="card kpi"><span>Businesses supported</span><strong>{supported}</strong></div>
-            <div className="card kpi"><span>Your campaigns</span><strong>{data.myCampaigns.length}</strong></div>
+            <div className="card kpi"><span>Saved campaigns</span><strong>{data.saved.length}</strong></div>
             <div className="card kpi"><span>Raised by your campaigns</span><strong>{formatTaka(totalRaised)}</strong></div>
           </div>
           <div className="dash__cols">

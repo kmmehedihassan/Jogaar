@@ -40,17 +40,31 @@ function freshDb() {
     sessions: {},
     campaigns: seedCampaigns(),
     pledges: [],
+    saved: {},
   };
+}
+
+/** Fills in fields added after a browser first stored its data. */
+function migrate(db) {
+  db.users = db.users || [];
+  db.sessions = db.sessions || {};
+  db.campaigns = db.campaigns || [];
+  db.pledges = db.pledges || [];
+  db.saved = db.saved || {};
+  db.campaigns.forEach((c) => {
+    if (!Array.isArray(c.updates)) c.updates = [];
+  });
+  return db;
 }
 
 function loadDb() {
   try {
     const raw = window.localStorage.getItem(DB_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) return migrate(JSON.parse(raw));
   } catch (_) {
     /* fall through */
   }
-  if (!memoryDb) memoryDb = freshDb();
+  if (!memoryDb) memoryDb = migrate(freshDb());
   return memoryDb;
 }
 
@@ -258,6 +272,30 @@ export async function updateProfile(token, { name, contact, bio }) {
   });
 }
 
+export async function changePassword(token, { current, next }) {
+  if (USING_REMOTE_AUTH) {
+    throw new ApiError("Changing your password is not supported by the server yet.");
+  }
+  await delay();
+  const db = loadDb();
+  const user = userForToken(db, token);
+  if (!user) throw new ApiError("Your session has expired. Please log in again.");
+  if ((await hashPassword(current, user.salt)) !== user.passwordHash) {
+    throw new ApiError("Your current password is incorrect.", "current");
+  }
+  const salt = randomId(8);
+  const passwordHash = await hashPassword(next, salt);
+  update((d) => {
+    const u = d.users.find((x) => x.id === user.id);
+    u.salt = salt;
+    u.passwordHash = passwordHash;
+    // Sign out every other session.
+    Object.keys(d.sessions).forEach((t) => {
+      if (t !== token && d.sessions[t] === user.id) delete d.sessions[t];
+    });
+  });
+}
+
 /* ------------------------------- campaigns ------------------------------ */
 
 export async function listCampaigns() {
@@ -307,11 +345,81 @@ export async function createCampaign(user, data) {
       goal: Number(data.goal),
       raised: 0,
       backers: 0,
+      updates: [],
       createdAt: now,
       endsAt: now + Number(data.durationDays) * 24 * 60 * 60 * 1000,
     };
     db.campaigns.unshift(campaign);
     return campaign;
+  });
+}
+
+function ownCampaign(db, user, id) {
+  if (!user) throw new ApiError("Please log in first.");
+  const campaign = db.campaigns.find((c) => c.id === id);
+  if (!campaign) throw new ApiError("This campaign no longer exists.");
+  if (campaign.ownerId !== user.id) throw new ApiError("Only the campaign owner can do that.");
+  return campaign;
+}
+
+export async function updateCampaign(user, id, data) {
+  await delay();
+  return update((db) => {
+    const campaign = ownCampaign(db, user, id);
+    campaign.title = data.title.trim();
+    campaign.category = data.category;
+    campaign.location = data.location.trim();
+    campaign.summary = data.summary.trim();
+    campaign.story = data.story
+      .split(/\n\s*\n/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+    campaign.goal = Number(data.goal);
+    if (data.image) campaign.image = data.image;
+    return { ...campaign };
+  });
+}
+
+export async function postUpdate(user, id, { title, body }) {
+  await delay();
+  return update((db) => {
+    const campaign = ownCampaign(db, user, id);
+    const entry = {
+      id: randomId(6),
+      title: title.trim(),
+      body: body.trim(),
+      createdAt: Date.now(),
+    };
+    campaign.updates.unshift(entry);
+    return { ...campaign };
+  });
+}
+
+export async function deleteCampaign(user, id) {
+  await delay();
+  update((db) => {
+    const campaign = ownCampaign(db, user, id);
+    if (campaign.raised > 0) {
+      throw new ApiError("Campaigns that have received contributions can't be deleted.");
+    }
+    db.campaigns = db.campaigns.filter((c) => c.id !== id);
+    Object.keys(db.saved).forEach((uid) => {
+      db.saved[uid] = db.saved[uid].filter((x) => x !== id);
+    });
+  });
+}
+
+export function getSavedIds(user) {
+  if (!user) return [];
+  return loadDb().saved[user.id] || [];
+}
+
+export async function toggleSaved(user, id) {
+  if (!user) throw new ApiError("Log in to save campaigns.");
+  return update((db) => {
+    const list = db.saved[user.id] || [];
+    db.saved[user.id] = list.includes(id) ? list.filter((x) => x !== id) : [id, ...list];
+    return db.saved[user.id];
   });
 }
 
@@ -360,5 +468,8 @@ export async function getDashboard(user) {
       ...p,
       campaign: db.campaigns.find((c) => c.id === p.campaignId) || null,
     }));
-  return { myCampaigns, myPledges };
+  const saved = (db.saved[user.id] || [])
+    .map((id) => db.campaigns.find((c) => c.id === id))
+    .filter(Boolean);
+  return { myCampaigns, myPledges, saved };
 }

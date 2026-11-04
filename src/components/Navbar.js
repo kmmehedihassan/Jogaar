@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useHistory, useLocation } from "react-router-dom";
-import { HiMenu, HiX, HiChevronDown } from "react-icons/hi";
+import { HiMenu, HiX, HiChevronDown, HiMoon, HiSun } from "react-icons/hi";
+import { useUi } from "../context/UiContext";
 import { useAuth } from "../context/AuthContext";
 import { initials } from "../utils/format";
 import Logo from "./Logo";
@@ -13,6 +14,7 @@ const LINKS = [
 
 export default function Navbar() {
   const { user, logout } = useAuth();
+  const { resolvedTheme, toggleTheme, toast } = useUi();
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -45,6 +47,7 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     await logout();
+    toast("You've been logged out.", "info");
     history.push("/");
   };
 
@@ -74,6 +77,14 @@ export default function Navbar() {
           </div>
 
           <div className="nav__actions">
+            <button
+              className="icon-btn"
+              onClick={toggleTheme}
+              aria-label={resolvedTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              title={resolvedTheme === "dark" ? "Light mode" : "Dark mode"}
+            >
+              {resolvedTheme === "dark" ? <HiSun size={20} /> : <HiMoon size={20} />}
+            </button>
             <Link to="/start" className="btn btn--outline btn--sm">
               Start a campaign
             </Link>
@@ -97,6 +108,7 @@ export default function Navbar() {
                     </div>
                     <Link role="menuitem" to="/dashboard">Dashboard</Link>
                     <Link role="menuitem" to="/dashboard?tab=pledges">My contributions</Link>
+                    <Link role="menuitem" to="/dashboard?tab=saved">Saved campaigns</Link>
                     <Link role="menuitem" to="/dashboard?tab=settings">Edit profile</Link>
                     <button role="menuitem" onClick={handleLogout}>Log out</button>
                   </div>

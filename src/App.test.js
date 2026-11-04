@@ -5,14 +5,17 @@ import { MemoryRouter } from "react-router-dom";
 import "@testing-library/jest-dom";
 import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
+import { UiProvider } from "./context/UiContext";
 import { resetLocalData } from "./api/client";
 
 function renderAt(path) {
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
+      <UiProvider>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </UiProvider>
     </MemoryRouter>
   );
 }
@@ -93,7 +96,8 @@ test("a signed-in user can back a campaign", async () => {
 
   expect(await screen.findByText("Thank you, Rahim!")).toBeInTheDocument();
   expect(screen.getByText("৳1,02,500")).toBeInTheDocument();
-  expect(screen.getByText("“Good luck!”")).toBeInTheDocument();
+  userEvent.click(screen.getByRole("tab", { name: /Backers/ }));
+  expect(await screen.findByText("“Good luck!”")).toBeInTheDocument();
 });
 
 test("a signed-in user can start a campaign", async () => {
@@ -116,6 +120,22 @@ test("a signed-in user can start a campaign", async () => {
 
   expect(await screen.findByRole("heading", { name: "Rahim's Tea Stall" })).toBeInTheDocument();
   expect(screen.getByText(/This is your campaign/)).toBeInTheDocument();
+
+  // Owner can post an update.
+  userEvent.click(screen.getByRole("tab", { name: /Updates/ }));
+  userEvent.click(await screen.findByRole("button", { name: /Post an update/ }));
+  userEvent.type(screen.getByLabelText("Update title"), "Stove installed");
+  userEvent.type(screen.getByLabelText("What's new?"), "The new stove arrived today. Thank you all!");
+  userEvent.click(screen.getByRole("button", { name: "Post update" }));
+  expect(await screen.findByRole("heading", { name: "Stove installed" })).toBeInTheDocument();
+
+  // Owner can edit the campaign.
+  userEvent.click(screen.getByRole("link", { name: /Edit/ }));
+  const title = await screen.findByLabelText("Campaign title");
+  userEvent.clear(title);
+  userEvent.type(title, "Rahim's Tea Corner");
+  userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+  expect(await screen.findByRole("heading", { name: "Rahim's Tea Corner" })).toBeInTheDocument();
 });
 
 test("unknown routes show the 404 page", () => {
@@ -128,4 +148,38 @@ test("unknown campaign shows 404", async () => {
   await waitFor(() =>
     expect(screen.getByRole("heading", { name: "We couldn't find that page" })).toBeInTheDocument()
   );
+});
+
+test("a signed-in user can save a campaign and see it on the dashboard", async () => {
+  renderAt("/register");
+  await signUp();
+  await screen.findByRole("heading", { name: "Hi, Rahim" });
+
+  userEvent.click(screen.getAllByRole("link", { name: "Discover" })[0]);
+  await screen.findByText("Retro Cafe");
+  fireEvent.click(screen.getAllByRole("button", { name: "Save campaign" })[0]);
+  expect(await screen.findByText("Saved to your list.")).toBeInTheDocument();
+
+  userEvent.click(screen.getAllByRole("link", { name: "Jogaar home" })[0]);
+  fireEvent.click(screen.getByRole("button", { name: /Rahim/ }));
+  userEvent.click(await screen.findByRole("menuitem", { name: "Saved campaigns" }));
+  expect(await screen.findAllByRole("button", { name: "Remove from saved" })).toHaveLength(1);
+});
+
+test("a user can change their password", async () => {
+  renderAt("/register");
+  await signUp();
+  await screen.findByRole("heading", { name: "Hi, Rahim" });
+  userEvent.click(screen.getByRole("tab", { name: "Profile settings" }));
+
+  userEvent.type(await screen.findByLabelText("Current password"), "nope");
+  userEvent.type(screen.getByLabelText("New password"), "NewSecret456");
+  userEvent.type(screen.getByLabelText("Confirm new password"), "NewSecret456");
+  userEvent.click(screen.getByRole("button", { name: "Change password" }));
+  expect(await screen.findByText("Your current password is incorrect.")).toBeInTheDocument();
+
+  userEvent.clear(screen.getByLabelText("Current password"));
+  userEvent.type(screen.getByLabelText("Current password"), "Secret123");
+  userEvent.click(screen.getByRole("button", { name: "Change password" }));
+  expect(await screen.findByText("Password changed.")).toBeInTheDocument();
 });
