@@ -1,37 +1,40 @@
 import React from "react";
-import Navbar from "./components/Navigation/Navbar";
-import "../node_modules/bootstrap/dist/css/bootstrap.min.css";
-import { Route, Switch } from "react-router-dom";
-import Home from "./components/Home/HomeMain";
-import Error from "./pages/Error";
-import Login from "./components/Login/Login";
-import Register from "./components/Register/Register"
+import { Route, Switch, useLocation } from "react-router-dom";
+import Navbar from "./components/Navbar";
+import Footer from "./components/Footer";
+import { ProtectedRoute, ScrollManager } from "./components/common";
+import Home from "./pages/Home";
+import Discover from "./pages/Discover";
+import CampaignDetail from "./pages/CampaignDetail";
+import StartCampaign from "./pages/StartCampaign";
+import Dashboard from "./pages/Dashboard";
+import { Login, Register } from "./pages/Auth";
+import { HowItWorks, Stories } from "./pages/Info";
+import NotFound from "./pages/NotFound";
 
-const App = () => {
+export default function App() {
+  const { pathname } = useLocation();
+  const isAuthPage = pathname === "/login" || pathname === "/register";
 
   return (
-    <>
-      <Navbar />
-      <Switch>
-        <Route exact path="/" component={Home} />
-        <Route exact path="/login" component={Login} />
-        <Route exact path="/Register" component={Register} />
-        <Route component={Error} />
-      </Switch>
-    </>
+    <div className="app">
+      <ScrollManager />
+      {!isAuthPage && <Navbar />}
+      <main className="app__main">
+        <Switch>
+          <Route exact path="/" component={Home} />
+          <Route path="/discover" component={Discover} />
+          <Route path="/campaigns/:id" component={CampaignDetail} />
+          <Route path="/how-it-works" component={HowItWorks} />
+          <Route path="/stories" component={Stories} />
+          <Route path="/login" component={Login} />
+          <Route path="/register" component={Register} />
+          <ProtectedRoute path="/start" component={StartCampaign} />
+          <ProtectedRoute path="/dashboard" component={Dashboard} />
+          <Route component={NotFound} />
+        </Switch>
+      </main>
+      {!isAuthPage && <Footer />}
+    </div>
   );
 }
-
-export default App;
-
-
-/*
-myenv\Scripts\activate
-cd DjangoAPI
-py manage.py runserver
-
-
-py manage.py makemigrations
-py manage.py migrate
-py manage.py runserver
-*/
