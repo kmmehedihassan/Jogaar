@@ -2,10 +2,13 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useHistory, useLocation } from "react-router-dom";
 import { HiSearch } from "react-icons/hi";
 import CampaignCard from "../components/CampaignCard";
-import { Spinner, useDocumentTitle } from "../components/common";
+import { useDocumentTitle } from "../components/common";
+import { CardGridSkeleton } from "../components/Skeleton";
 import { listCampaigns } from "../api/client";
 import { CATEGORIES } from "../data/seed";
 import { isEnded, percentFunded } from "../utils/format";
+
+const PAGE_SIZE = 6;
 
 const SORTS = {
   trending: { label: "Most backers", fn: (a, b) => b.backers - a.backers },
@@ -20,7 +23,8 @@ export default function Discover() {
   const history = useHistory();
   const params = new URLSearchParams(location.search);
   const category = params.get("category") || "All";
-  const [query, setQuery] = useState(params.get("q") || "");
+  const [query, setQueryState] = useState(params.get("q") || "");
+  const [limit, setLimit] = useState(PAGE_SIZE);
   const [sort, setSort] = useState("trending");
   const [showEnded, setShowEnded] = useState(false);
   const [campaigns, setCampaigns] = useState(null);
@@ -33,11 +37,20 @@ export default function Discover() {
     };
   }, []);
 
-  const setCategory = (cat) => {
+  const setParam = (key, value) => {
     const next = new URLSearchParams(location.search);
-    if (cat === "All") next.delete("category");
-    else next.set("category", cat);
+    if (!value || value === "All") next.delete(key);
+    else next.set(key, value);
     history.replace({ search: next.toString() });
+  };
+  const setCategory = (cat) => {
+    setLimit(PAGE_SIZE);
+    setParam("category", cat);
+  };
+  const setQuery = (q) => {
+    setQueryState(q);
+    setLimit(PAGE_SIZE);
+    setParam("q", q.trim());
   };
 
   const results = useMemo(() => {
@@ -104,15 +117,24 @@ export default function Discover() {
       </div>
 
       {!campaigns ? (
-        <Spinner />
+        <CardGridSkeleton count={6} />
       ) : results.length ? (
         <>
-          <p className="muted small">{results.length} campaign{results.length === 1 ? "" : "s"}</p>
+          <p className="muted small">
+            Showing {Math.min(limit, results.length)} of {results.length} campaign{results.length === 1 ? "" : "s"}
+          </p>
           <div className="grid grid--3">
-            {results.map((c) => (
+            {results.slice(0, limit).map((c) => (
               <CampaignCard key={c.id} campaign={c} />
             ))}
           </div>
+          {results.length > limit && (
+            <div className="load-more">
+              <button className="btn btn--outline" onClick={() => setLimit((l) => l + PAGE_SIZE)}>
+                Load more ({results.length - limit} more)
+              </button>
+            </div>
+          )}
         </>
       ) : (
         <div className="empty">

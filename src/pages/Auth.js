@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link, Redirect, useHistory, useLocation } from "react-router-dom";
 import { Alert, Field, useDocumentTitle } from "../components/common";
 import { useAuth } from "../context/AuthContext";
+import { useUi } from "../context/UiContext";
 import { EMAIL_RE } from "../utils/format";
 import hero from "../assets/images/story-nadia.jpg";
 import Logo from "../components/Logo";
@@ -101,10 +102,14 @@ function useAuthForm(initial, validator, action) {
 export function Login() {
   useDocumentTitle("Log in");
   const { user, login } = useAuth();
+  const { toast } = useUi();
   const { fieldProps, onSubmit, formError, busy, state } = useAuthForm(
     { email: "", password: "" },
     validateLogin,
-    login
+    async (v) => {
+      const u = await login(v);
+      toast(`Welcome back, ${u.name.split(" ")[0]}!`);
+    }
   );
   if (user) return <Redirect to="/dashboard" />;
 
@@ -128,10 +133,14 @@ export function Login() {
 export function Register() {
   useDocumentTitle("Create an account");
   const { user, register } = useAuth();
+  const { toast } = useUi();
   const { fieldProps, onSubmit, formError, busy, state } = useAuthForm(
     { name: "", email: "", password: "", confirm: "", contact: "" },
     validateRegister,
-    register
+    async (v) => {
+      const u = await register(v);
+      toast(`Welcome to Jogaar, ${u.name.split(" ")[0]}!`);
+    }
   );
   if (user) return <Redirect to="/dashboard" />;
 

@@ -6,7 +6,7 @@ import { ProtectedRoute, ScrollManager } from "./components/common";
 import Home from "./pages/Home";
 import Discover from "./pages/Discover";
 import CampaignDetail from "./pages/CampaignDetail";
-import StartCampaign from "./pages/StartCampaign";
+import StartCampaign, { EditCampaign } from "./pages/StartCampaign";
 import Dashboard from "./pages/Dashboard";
 import { Login, Register } from "./pages/Auth";
 import { HowItWorks, Stories } from "./pages/Info";
@@ -24,6 +24,7 @@ export default function App() {
         <Switch>
           <Route exact path="/" component={Home} />
           <Route path="/discover" component={Discover} />
+          <ProtectedRoute path="/campaigns/:id/edit" component={EditCampaign} />
           <Route path="/campaigns/:id" component={CampaignDetail} />
           <Route path="/how-it-works" component={HowItWorks} />
           <Route path="/stories" component={Stories} />

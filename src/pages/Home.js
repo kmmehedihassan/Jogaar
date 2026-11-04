@@ -4,7 +4,8 @@ import { HiArrowRight, HiLightBulb, HiShare, HiCash } from "react-icons/hi";
 import hero from "../assets/images/hero.jpg";
 import CampaignCard from "../components/CampaignCard";
 import Faq from "../components/Faq";
-import { Spinner, useDocumentTitle } from "../components/common";
+import { useDocumentTitle } from "../components/common";
+import { CardGridSkeleton } from "../components/Skeleton";
 import { listCampaigns } from "../api/client";
 import { CATEGORIES, STORIES } from "../data/seed";
 import { formatNumber, formatTaka, isEnded, percentFunded } from "../utils/format";
@@ -117,7 +118,7 @@ export default function Home() {
             ))}
           </div>
         ) : (
-          <Spinner />
+          <CardGridSkeleton />
         )}
         <div className="category-row">
           {CATEGORIES.map((cat) => (

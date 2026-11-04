@@ -61,6 +61,20 @@ export function seedCampaigns(now = Date.now()) {
       raised: 279000,
       backers: 214,
       createdAt: now - 40 * DAY,
+      updates: [
+        {
+          id: "u2",
+          title: "93% there — thank you!",
+          body: "We're almost fully funded. The kiln supplier has confirmed delivery for next month, and we've started clearing space for the showroom.",
+          createdAt: now - 3 * DAY,
+        },
+        {
+          id: "u1",
+          title: "First 100 backers",
+          body: "We never expected this much support in the first week. Every one of you will get a personal thank-you card.",
+          createdAt: now - 33 * DAY,
+        },
+      ],
       endsAt: now + 6 * DAY,
     },
     {
@@ -81,6 +95,14 @@ export function seedCampaigns(now = Date.now()) {
       raised: 315000,
       backers: 187,
       createdAt: now - 25 * DAY,
+      updates: [
+        {
+          id: "u1",
+          title: "Generator ordered",
+          body: "Thanks to your support we've ordered the backup generator. No more lost birds during load-shedding this summer.",
+          createdAt: now - 8 * DAY,
+        },
+      ],
       endsAt: now + 20 * DAY,
     },
     {
@@ -161,7 +183,7 @@ export function seedCampaigns(now = Date.now()) {
       createdAt: now - 2 * DAY,
       endsAt: now + 43 * DAY,
     },
-  ];
+  ].map((c) => ({ updates: [], ...c }));
 }
 
 export const STORIES = [

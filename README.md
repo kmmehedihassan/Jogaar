@@ -11,6 +11,12 @@ Jogaar is a crowdfunding platform for small businesses and aspiring entrepreneur
 - **Accounts**: sign up, log in, log out, and protected pages that send you back where you were after logging in.
 - **Dashboard**: totals, your campaigns, your contributions, and profile settings.
 - **Info pages**: how it works, success stories, FAQ, and a 404 page.
+- **Owner tools**: edit your campaign, post updates for backers, and delete a campaign that hasn't received money yet.
+- **Saved campaigns**: tap the heart on any campaign to save it to your dashboard.
+- **Share**: uses your phone's share menu where available, otherwise copies the link.
+- **Account security**: change your password from the dashboard.
+- **Dark mode**: follows your system setting or the toggle in the navbar.
+- Notifications for actions, loading placeholders, and "Load more" on Discover.
 - Responsive layout for phone, tablet and desktop.
 
 ## Getting started
