@@ -1,18 +1,18 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { FaFacebookF, FaInstagram, FaTwitter } from "react-icons/fa";
+import { useUi } from "../context/UiContext";
+import { formatNumber } from "../utils/format";
 import Logo from "./Logo";
 
 export default function Footer() {
+  const { t } = useUi();
   return (
     <footer className="footer">
       <div className="container footer__grid">
         <div className="footer__brand">
           <Logo light />
-          <p>
-            Crowdfunding for small businesses and aspiring entrepreneurs across
-            Bangladesh.
-          </p>
+          <p>{t("footer.tagline")}</p>
           <div className="footer__social">
             <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
               <FaFacebookF />
@@ -27,33 +27,33 @@ export default function Footer() {
         </div>
 
         <div>
-          <h4>Explore</h4>
+          <h4>{t("footer.explore")}</h4>
           <ul>
-            <li><Link to="/discover">Discover campaigns</Link></li>
-            <li><Link to="/stories">Success stories</Link></li>
-            <li><Link to="/start">Start a campaign</Link></li>
+            <li><Link to="/discover">{t("footer.discover")}</Link></li>
+            <li><Link to="/stories">{t("footer.stories")}</Link></li>
+            <li><Link to="/start">{t("nav.start")}</Link></li>
           </ul>
         </div>
 
         <div>
-          <h4>Help</h4>
+          <h4>{t("footer.help")}</h4>
           <ul>
-            <li><Link to="/how-it-works">How it works</Link></li>
-            <li><Link to="/how-it-works#faq">FAQ</Link></li>
-            <li><Link to="/register">Create an account</Link></li>
+            <li><Link to="/how-it-works">{t("nav.how")}</Link></li>
+            <li><Link to="/how-it-works#faq">{t("footer.faq")}</Link></li>
+            <li><Link to="/register">{t("footer.register")}</Link></li>
           </ul>
         </div>
 
         <div>
-          <h4>Contact</h4>
+          <h4>{t("footer.contact")}</h4>
           <ul>
             <li><a href="mailto:hello@jogaar.example">hello@jogaar.example</a></li>
-            <li>Dhaka, Bangladesh</li>
+            <li>{t("footer.address")}</li>
           </ul>
         </div>
       </div>
       <div className="container footer__bottom">
-        © {new Date().getFullYear()} Jogaar Ltd. All rights reserved.
+        {t("footer.rights", { year: formatNumber(new Date().getFullYear()).replace(/,/g, "") })}
       </div>
     </footer>
   );

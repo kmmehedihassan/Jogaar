@@ -2,12 +2,14 @@ import React, { useEffect, useState } from "react";
 import { Redirect, Route, useLocation } from "react-router-dom";
 import { HiEye, HiEyeOff } from "react-icons/hi";
 import { useAuth } from "../context/AuthContext";
+import { useUi } from "../context/UiContext";
 
-export function Spinner({ label = "Loading…" }) {
+export function Spinner() {
+  const { t } = useUi();
   return (
     <div className="spinner-wrap" role="status">
       <span className="spinner" aria-hidden="true" />
-      <span className="sr-only">{label}</span>
+      <span className="sr-only">{t("common.loading")}</span>
     </div>
   );
 }
@@ -22,9 +24,10 @@ export function Alert({ type = "error", children }) {
 }
 
 /** Labelled form input with inline error and optional password reveal. */
-export function Field({ label, name, error, hint, type = "text", as = "input", children, ...props }) {
+export function Field({ label, name, error, hint, type = "text", as = "input", children, id: idProp, ...props }) {
+  const { t } = useUi();
   const [reveal, setReveal] = useState(false);
-  const id = `field-${name}`;
+  const id = idProp || `field-${name}`;
   const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
   const common = {
     id,
@@ -46,7 +49,7 @@ export function Field({ label, name, error, hint, type = "text", as = "input", c
           type="button"
           className="input-group__btn"
           onClick={() => setReveal((r) => !r)}
-          aria-label={reveal ? "Hide password" : "Show password"}
+          aria-label={reveal ? t("common.hidePassword") : t("common.showPassword")}
         >
           {reveal ? <HiEyeOff /> : <HiEye />}
         </button>
@@ -56,12 +59,18 @@ export function Field({ label, name, error, hint, type = "text", as = "input", c
 
   return (
     <div className="field">
-      <label htmlFor={id} className="field__label">{label}</label>
+      <label htmlFor={id} className="field__label">
+        {label}
+      </label>
       {control}
       {error ? (
-        <p id={`${id}-error`} className="field__error">{error}</p>
+        <p id={`${id}-error`} className="field__error">
+          {error}
+        </p>
       ) : hint ? (
-        <p id={`${id}-hint`} className="field__hint">{hint}</p>
+        <p id={`${id}-hint`} className="field__hint">
+          {hint}
+        </p>
       ) : null}
     </div>
   );
@@ -102,8 +111,10 @@ export function ScrollManager() {
   return null;
 }
 
+/** Sets the browser tab title. Pass an already-translated title. */
 export function useDocumentTitle(title) {
+  const { t } = useUi();
   useEffect(() => {
-    document.title = title ? `${title} · Jogaar` : "Jogaar — Crowdfunding for small businesses";
-  }, [title]);
+    document.title = title ? `${title} · Jogaar` : t("doc.default");
+  }, [title, t]);
 }

@@ -1,7 +1,18 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { HiCheckCircle, HiExclamationCircle, HiInformationCircle, HiX } from "react-icons/hi";
+import { ERROR_BN, STRINGS } from "../i18n/strings";
+import { setLocale } from "../utils/format";
 
 const THEME_KEY = "jogaar:theme";
+const LANG_KEY = "jogaar:lang";
+
+function readLang() {
+  try {
+    const l = window.localStorage.getItem(LANG_KEY);
+    if (l === "en" || l === "bn") return l;
+  } catch (_) {}
+  return "en";
+}
 const UiContext = createContext(null);
 
 function readTheme() {
@@ -52,37 +63,74 @@ export function UiProvider({ children }) {
     [resolvedTheme, setTheme]
   );
 
+  /* ----------------------------- language ---------------------------- */
+  const [lang, setLangState] = useState(() => {
+    const l = readLang();
+    setLocale(l);
+    return l;
+  });
+
+  const setLang = useCallback((l) => {
+    setLocale(l);
+    setLangState(l);
+    try {
+      window.localStorage.setItem(LANG_KEY, l);
+    } catch (_) {}
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("lang", lang === "bn" ? "bn" : "en");
+  }, [lang]);
+
+  /** Translates a key, filling {placeholders} from vars. */
+  const t = useCallback(
+    (key, vars) => {
+      let text = (STRINGS[lang] && STRINGS[lang][key]) || STRINGS.en[key] || key;
+      if (vars) {
+        text = text.replace(/\{(\w+)\}/g, (m, name) => (vars[name] !== undefined ? String(vars[name]) : m));
+      }
+      return text;
+    },
+    [lang]
+  );
+
+  /** Translates a message coming from the data layer or server. */
+  const tErr = useCallback(
+    (message) => (lang === "bn" && ERROR_BN[message]) || message || t("common.generic"),
+    [lang, t]
+  );
+
   /* ------------------------------ toasts ----------------------------- */
   const [toasts, setToasts] = useState([]);
   const nextId = useRef(1);
 
-  const dismiss = useCallback((id) => setToasts((t) => t.filter((x) => x.id !== id)), []);
+  const dismiss = useCallback((id) => setToasts((list) => list.filter((x) => x.id !== id)), []);
 
   const toast = useCallback(
     (message, type = "success") => {
       const id = nextId.current++;
-      setToasts((t) => [...t.slice(-2), { id, message, type }]);
+      setToasts((list) => [...list.slice(-2), { id, message, type }]);
       setTimeout(() => dismiss(id), 4000);
     },
     [dismiss]
   );
 
   const value = useMemo(
-    () => ({ theme, resolvedTheme, setTheme, toggleTheme, toast }),
-    [theme, resolvedTheme, setTheme, toggleTheme, toast]
+    () => ({ theme, resolvedTheme, setTheme, toggleTheme, toast, lang, setLang, t, tErr }),
+    [theme, resolvedTheme, setTheme, toggleTheme, toast, lang, setLang, t, tErr]
   );
 
   return (
     <UiContext.Provider value={value}>
       {children}
       <div className="toasts" aria-live="polite">
-        {toasts.map((t) => {
-          const Icon = ICONS[t.type] || HiInformationCircle;
+        {toasts.map((item) => {
+          const Icon = ICONS[item.type] || HiInformationCircle;
           return (
-            <div key={t.id} className={`toast toast--${t.type}`} role="status">
+            <div key={item.id} className={`toast toast--${item.type}`} role="status">
               <Icon size={20} />
-              <span>{t.message}</span>
-              <button aria-label="Dismiss" onClick={() => dismiss(t.id)}>
+              <span>{item.message}</span>
+              <button aria-label={t("common.dismiss")} onClick={() => dismiss(item.id)}>
                 <HiX />
               </button>
             </div>

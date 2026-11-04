@@ -6,6 +6,8 @@
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^13.3.0",
     "@testing-library/user-event": "^13.5.0",
+    "better-sqlite3": "^12.11.1",
+    "express": "^5.3.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-icons": "^4.4.0",
@@ -16,7 +18,10 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
+    "build:server": "node scripts/build-with-server.js",
+    "server": "node server/index.js",
     "test": "react-scripts test",
+    "test:server": "node --test server/test/api.test.js",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
@@ -36,5 +41,9 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "proxy": "http://localhost:4000",
+  "engines": {
+    "node": ">=18"
   }
 }

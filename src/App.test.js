@@ -31,6 +31,7 @@ async function signUp(name = "Rahim Uddin", email = "rahim@example.com") {
 beforeEach(() => {
   window.localStorage.clear();
   resetLocalData();
+  document.documentElement.setAttribute("lang", "en");
   window.scrollTo = jest.fn();
 });
 
@@ -182,4 +183,100 @@ test("a user can change their password", async () => {
   userEvent.type(screen.getByLabelText("Current password"), "Secret123");
   userEvent.click(screen.getByRole("button", { name: "Change password" }));
   expect(await screen.findByText("Password changed.")).toBeInTheDocument();
+});
+
+test("a backer can choose a reward and it is recorded", async () => {
+  renderAt("/register");
+  await signUp();
+  await screen.findByRole("heading", { name: "Hi, Rahim" });
+
+  userEvent.click(screen.getAllByRole("link", { name: "Discover" })[0]);
+  userEvent.click(await screen.findByText("Mishu's Pottery Studio"));
+  await screen.findByRole("heading", { name: "Mishu's Pottery Studio" });
+
+  // Choosing the ৳5,000 vase set raises the amount to the reward minimum.
+  userEvent.click(screen.getByRole("radio", { name: /Vase set/ }));
+  expect(screen.getByLabelText("Amount (৳)")).toHaveValue(5000);
+
+  // Going below the minimum is rejected.
+  userEvent.clear(screen.getByLabelText("Amount (৳)"));
+  userEvent.type(screen.getByLabelText("Amount (৳)"), "1000");
+  userEvent.click(screen.getByRole("button", { name: "Back with ৳1,000" }));
+  expect(await screen.findByText("Your contribution is below this reward's minimum.")).toBeInTheDocument();
+
+  userEvent.clear(screen.getByLabelText("Amount (৳)"));
+  userEvent.type(screen.getByLabelText("Amount (৳)"), "5000");
+  userEvent.click(screen.getByRole("button", { name: "Back with ৳5,000" }));
+  expect(await screen.findByText("Your reward: Vase set")).toBeInTheDocument();
+
+  userEvent.click(screen.getByRole("tab", { name: /Backers/ }));
+  expect(await screen.findByText("Reward: Vase set")).toBeInTheDocument();
+});
+
+test("signed-in users can comment and delete their own comments", async () => {
+  window.confirm = jest.fn(() => true);
+  renderAt("/campaigns/karim-poultry");
+  userEvent.click(await screen.findByRole("tab", { name: /Comments/ }));
+  expect(screen.getByText("Great to see local farms growing. Good luck, Karim bhai!")).toBeInTheDocument();
+  userEvent.click(screen.getByRole("link", { name: "Log in to join the conversation." }));
+
+  userEvent.click(await screen.findByRole("link", { name: "Create an account" }));
+  await signUp();
+  userEvent.click(await screen.findByRole("tab", { name: /Comments/ }));
+  userEvent.type(screen.getByLabelText("Your comment"), "Count me in for eggs!");
+  const post = screen.getByRole("button", { name: "Post comment" });
+  await waitFor(() => expect(post).toBeEnabled());
+  userEvent.click(post);
+  expect(await screen.findByText("Comment posted.")).toBeInTheDocument();
+  expect(screen.getByText("Count me in for eggs!", { selector: ".comment p" })).toBeInTheDocument();
+
+  userEvent.click(screen.getByRole("button", { name: "Delete comment" }));
+  await waitFor(() =>
+    expect(screen.queryByText("Count me in for eggs!", { selector: ".comment p" })).not.toBeInTheDocument()
+  );
+});
+
+test("an owner can add reward tiers when starting a campaign", async () => {
+  renderAt("/register");
+  await signUp();
+  await screen.findByRole("heading", { name: "Hi, Rahim" });
+  userEvent.click(screen.getAllByRole("link", { name: "Start a campaign" })[0]);
+  await screen.findByRole("heading", { name: "Tell us about your business" });
+
+  userEvent.type(screen.getByLabelText("Campaign title"), "Rahim's Tea Stall");
+  userEvent.selectOptions(screen.getByLabelText("Category"), "Food & Drink");
+  userEvent.type(screen.getByLabelText("Location"), "Mirpur, Dhaka");
+  userEvent.type(screen.getByLabelText("Funding goal (৳)"), "50000");
+  userEvent.type(screen.getByLabelText("Short summary"), "A clean, friendly tea stall near the stadium.");
+  userEvent.type(
+    screen.getByLabelText("Your story"),
+    "I have sold tea from a flask for five years. A proper stall with a stove and seating will let me serve more customers every day."
+  );
+  userEvent.click(screen.getByRole("button", { name: "Add a reward" }));
+  userEvent.click(screen.getByRole("button", { name: "Publish campaign" }));
+  expect(await screen.findByText("Every reward needs a title.")).toBeInTheDocument();
+
+  userEvent.type(screen.getByLabelText("Reward name"), "Free tea for a month");
+  userEvent.type(screen.getByLabelText("Minimum amount (৳)"), "500");
+  userEvent.type(screen.getByLabelText("Quantity (optional)"), "20");
+  userEvent.click(screen.getByRole("button", { name: "Publish campaign" }));
+
+  await screen.findByRole("heading", { name: "Rahim's Tea Stall" });
+  expect(screen.getByText("Free tea for a month")).toBeInTheDocument();
+  expect(screen.getByText("20 of 20 left")).toBeInTheDocument();
+});
+
+test("the interface can switch to Bangla and back", async () => {
+  renderAt("/");
+  await screen.findByText("Mishu's Pottery Studio");
+  userEvent.click(screen.getByRole("button", { name: /View in Bangla/ }));
+
+  expect(await screen.findByRole("heading", { name: /ছোট ব্যবসা/ })).toBeInTheDocument();
+  expect(screen.getAllByText("হস্তশিল্প").length).toBeGreaterThan(0);
+  expect(screen.getByText("৳২,৭৯,০০০")).toBeInTheDocument();
+  expect(document.documentElement.getAttribute("lang")).toBe("bn");
+  expect(window.localStorage.getItem("jogaar:lang")).toBe("bn");
+
+  userEvent.click(screen.getByRole("button", { name: /View in English/ }));
+  expect(await screen.findByRole("heading", { name: /Small businesses/ })).toBeInTheDocument();
 });

@@ -1,4 +1,5 @@
 import React from "react";
+import { useUi } from "../context/UiContext";
 
 export function CardSkeleton() {
   return (
@@ -15,8 +16,9 @@ export function CardSkeleton() {
 }
 
 export function CardGridSkeleton({ count = 3 }) {
+  const { t } = useUi();
   return (
-    <div className="grid grid--3" role="status" aria-label="Loading campaigns">
+    <div className="grid grid--3" role="status" aria-label={t("common.loading")}>
       {Array.from({ length: count }, (_, i) => (
         <CardSkeleton key={i} />
       ))}

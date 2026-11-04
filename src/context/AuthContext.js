@@ -22,7 +22,15 @@ function writeToken(token) {
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(readToken);
   const [user, setUser] = useState(null);
+  const [savedIds, setSavedIds] = useState([]);
   const [ready, setReady] = useState(!readToken());
+
+  const clearSession = useCallback(() => {
+    writeToken(null);
+    setToken(null);
+    setUser(null);
+    setSavedIds([]);
+  }, []);
 
   // Restore the session on load.
   useEffect(() => {
@@ -34,12 +42,7 @@ export function AuthProvider({ children }) {
     api
       .getCurrentUser(token)
       .then((u) => !cancelled && setUser(u))
-      .catch(() => {
-        if (cancelled) return;
-        writeToken(null);
-        setToken(null);
-        setUser(null);
-      })
+      .catch(() => !cancelled && clearSession())
       .finally(() => !cancelled && setReady(true));
     return () => {
       cancelled = true;
@@ -48,6 +51,19 @@ export function AuthProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Load the user's saved campaigns whenever they sign in.
+  useEffect(() => {
+    let cancelled = false;
+    if (!token || !user) return undefined;
+    api
+      .getSavedIds(token)
+      .then((ids) => !cancelled && setSavedIds(ids))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [token, user]);
+
   const startSession = useCallback(({ token: t, user: u }) => {
     writeToken(t);
     setToken(t);
@@ -55,25 +71,16 @@ export function AuthProvider({ children }) {
     return u;
   }, []);
 
-  const login = useCallback(
-    async (credentials) => startSession(await api.login(credentials)),
-    [startSession]
-  );
-
-  const register = useCallback(
-    async (details) => startSession(await api.register(details)),
-    [startSession]
-  );
+  const login = useCallback(async (credentials) => startSession(await api.login(credentials)), [startSession]);
+  const register = useCallback(async (details) => startSession(await api.register(details)), [startSession]);
 
   const logout = useCallback(async () => {
     try {
       await api.logout(token);
     } finally {
-      writeToken(null);
-      setToken(null);
-      setUser(null);
+      clearSession();
     }
-  }, [token]);
+  }, [token, clearSession]);
 
   const updateProfile = useCallback(
     async (changes) => {
@@ -84,9 +91,18 @@ export function AuthProvider({ children }) {
     [token]
   );
 
+  const toggleSaved = useCallback(
+    async (campaignId) => {
+      const ids = await api.toggleSaved(token, campaignId);
+      setSavedIds(ids);
+      return ids.includes(campaignId);
+    },
+    [token]
+  );
+
   const value = useMemo(
-    () => ({ user, token, ready, login, register, logout, updateProfile }),
-    [user, token, ready, login, register, logout, updateProfile]
+    () => ({ user, token, ready, savedIds, login, register, logout, updateProfile, toggleSaved }),
+    [user, token, ready, savedIds, login, register, logout, updateProfile, toggleSaved]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

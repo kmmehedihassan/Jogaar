@@ -5,48 +5,88 @@ Jogaar is a crowdfunding platform for small businesses and aspiring entrepreneur
 ## Features
 
 - **Discover**: search campaigns, filter by category, sort them, and show or hide ended campaigns.
-- **Campaign pages**: story, funding progress, backers, days left, and recent supporters with their messages.
+- **Campaign pages**: story, updates, comments and backers tabs, funding progress and days left.
+- **Reward tiers**: owners offer up to 5 rewards with a minimum amount and an optional quantity limit; backers pick one when they contribute.
 - **Back a campaign**: preset or custom amount, bKash / Nagad / Card, a message, and an anonymous option. Checkout is a demo and charges nothing.
-- **Start a campaign**: a validated form with an optional cover image upload.
-- **Accounts**: sign up, log in, log out, and protected pages that send you back where you were after logging in.
-- **Dashboard**: totals, your campaigns, your contributions, and profile settings.
-- **Info pages**: how it works, success stories, FAQ, and a 404 page.
-- **Owner tools**: edit your campaign, post updates for backers, and delete a campaign that hasn't received money yet.
-- **Saved campaigns**: tap the heart on any campaign to save it to your dashboard.
-- **Share**: uses your phone's share menu where available, otherwise copies the link.
-- **Account security**: change your password from the dashboard.
-- **Dark mode**: follows your system setting or the toggle in the navbar.
-- Notifications for actions, loading placeholders, and "Load more" on Discover.
-- Responsive layout for phone, tablet and desktop.
+- **Comments**: signed-in users can comment; owners get a "Creator" badge and can remove comments on their campaign.
+- **Owner tools**: start, edit and delete (if unfunded) campaigns, and post updates for backers.
+- **Accounts**: sign up, log in, change password, profile settings, saved campaigns and a dashboard.
+- **Bangla and English**: switch language from the navbar; numbers and dates use Bangla digits.
+- **Dark mode**, notifications, loading placeholders, and a responsive layout for phone, tablet and desktop.
 
 ## Getting started
 
 ```bash
 npm install
-npm start      # http://localhost:3000
-npm test       # run the test suite
-npm run build  # production build in ./build
 ```
 
-## Data and backend
+### Option 1 — website only (no server)
 
-The app works with no server. Accounts, campaigns and contributions are stored in the
-browser's `localStorage`, and passwords are stored only as salted SHA-256 hashes.
-This is for demos and development only, because every user's data stays in their own browser.
+```bash
+npm start
+```
 
-To use a real backend for authentication, copy `.env.example` to `.env.local` and set
-`REACT_APP_API_URL`. See `src/api/client.js` for the endpoints the app expects. Campaigns and
-contributions stay in the local store until the backend has endpoints for them.
+Opens http://localhost:3000. All data is kept in your browser's `localStorage`, so each visitor sees only their own accounts and contributions. Good for demos.
+
+### Option 2 — full app with the server
+
+The server (`server/`) is Node.js + Express with a SQLite database. It stores accounts, campaigns, rewards, contributions, comments and saved campaigns, and serves the website.
+
+```bash
+npm run build:server   # build the website to talk to the server
+npm run server         # http://localhost:4000
+```
+
+The database is created at `server/data/jogaar.db` with the sample campaigns on first run. Settings:
+
+| Variable    | Default                 | Purpose                        |
+| ----------- | ----------------------- | ------------------------------ |
+| `PORT`      | `4000`                  | Port the server listens on     |
+| `JOGAAR_DB` | `server/data/jogaar.db` | Path to the SQLite file        |
+
+**While developing**, run the server and the React dev server side by side:
+
+```bash
+npm run server
+```
+
+and in a second terminal, with `REACT_APP_API_URL=/api` in `.env.local`:
+
+```bash
+npm start
+```
+
+The dev server forwards `/api` requests to port 4000.
+
+### Tests
+
+```bash
+npm test             # website tests
+npm run test:server  # API tests
+```
+
+## Security notes
+
+- Passwords are hashed with scrypt and a per-user salt; session tokens are random and stored only as SHA-256 hashes, and expire after 30 days.
+- Changing a password signs out the account's other sessions. Repeated failed logins are rate-limited.
+- All input is validated on the server; uploaded cover images must be JPEG, PNG or WebP and under about 1 MB.
+- Payments are a demo. Connect a real payment provider before handling money.
 
 ## Project structure
 
 ```
 src/
-  api/client.js          data layer (local store + optional remote auth)
+  api/                   data layer: local.js (browser store), remote.js (server), client.js picks one
   context/AuthContext.js session state
   components/            Navbar, Footer, CampaignCard, form fields, FAQ…
   pages/                 Home, Discover, CampaignDetail, StartCampaign, Auth, Dashboard, Info, NotFound
-  data/seed.js           starter campaigns, stories, FAQ
+  data/                  sample campaigns (campaigns.json, shared with the server) and stories
+  i18n/strings.js        English and Bangla text
   styles/global.css      design system and all styles
   assets/images/         optimised images
+server/
+  app.js                 REST API (/api/...)
+  db.js                  SQLite schema and sample data
+  index.js               starts the server and serves the built website
+  test/                  API tests
 ```

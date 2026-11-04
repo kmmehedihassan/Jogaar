@@ -7,34 +7,47 @@ import Faq from "../components/Faq";
 import { useDocumentTitle } from "../components/common";
 import { CardGridSkeleton } from "../components/Skeleton";
 import { listCampaigns } from "../api/client";
+import { useUi } from "../context/UiContext";
 import { CATEGORIES, STORIES } from "../data/seed";
 import { formatNumber, formatTaka, isEnded, percentFunded } from "../utils/format";
 
 export const STEPS = [
-  {
-    icon: HiLightBulb,
-    title: "Share your idea",
-    text: "Tell your story, set a funding goal and a deadline. It takes about ten minutes.",
-  },
-  {
-    icon: HiShare,
-    title: "Rally supporters",
-    text: "Share your campaign with friends, family and the Jogaar community.",
-  },
-  {
-    icon: HiCash,
-    title: "Grow your business",
-    text: "Receive the funds when your campaign ends and keep backers updated.",
-  },
+  { icon: HiLightBulb, key: "step1" },
+  { icon: HiShare, key: "step2" },
+  { icon: HiCash, key: "step3" },
 ];
 
+export function Steps() {
+  const { t } = useUi();
+  return (
+    <div className="grid grid--3">
+      {STEPS.map(({ icon: Icon, key }, i) => (
+        <div key={key} className="step">
+          <span className="step__icon"><Icon size={26} /></span>
+          <span className="step__num">{formatNumber(0)}{formatNumber(i + 1)}</span>
+          <h3>{t(`${key}.title`)}</h3>
+          <p className="muted">{t(`${key}.text`)}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Story text in the current language. */
+export function storyText(story, lang) {
+  return lang === "bn" && story.bn ? { ...story, ...story.bn } : story;
+}
+
 export default function Home() {
+  const { t, lang } = useUi();
   useDocumentTitle();
   const [campaigns, setCampaigns] = useState(null);
 
   useEffect(() => {
     let alive = true;
-    listCampaigns().then((c) => alive && setCampaigns(c));
+    listCampaigns()
+      .then((c) => alive && setCampaigns(c))
+      .catch(() => alive && setCampaigns([]));
     return () => {
       alive = false;
     };
@@ -65,23 +78,16 @@ export default function Home() {
         <img className="hero__bg" src={hero} alt="" />
         <div className="hero__overlay" />
         <div className="container hero__content">
-          <span className="eyebrow eyebrow--light">Crowdfunding for Bangladesh</span>
+          <span className="eyebrow eyebrow--light">{t("home.eyebrow")}</span>
           <h1>
-            Small businesses,
+            {t("home.title1")}
             <br />
-            <span className="hl">big dreams.</span>
+            <span className="hl">{t("home.title2")}</span>
           </h1>
-          <p className="hero__lead">
-            Jogaar helps local entrepreneurs raise the money they need from
-            people who believe in them.
-          </p>
+          <p className="hero__lead">{t("home.lead")}</p>
           <div className="hero__cta">
-            <Link to="/discover" className="btn btn--primary btn--lg">
-              Discover campaigns
-            </Link>
-            <Link to="/start" className="btn btn--ghost-light btn--lg">
-              Start a campaign
-            </Link>
+            <Link to="/discover" className="btn btn--primary btn--lg">{t("home.discover")}</Link>
+            <Link to="/start" className="btn btn--ghost-light btn--lg">{t("nav.start")}</Link>
           </div>
         </div>
       </section>
@@ -89,26 +95,26 @@ export default function Home() {
       <section className="stats container">
         <div>
           <strong>{formatTaka(stats.raised)}</strong>
-          <span>raised for local businesses</span>
+          <span>{t("home.statRaised")}</span>
         </div>
         <div>
           <strong>{formatNumber(stats.backers)}</strong>
-          <span>backers on live campaigns</span>
+          <span>{t("home.statBackers")}</span>
         </div>
         <div>
-          <strong>{stats.live}</strong>
-          <span>campaigns open now</span>
+          <strong>{formatNumber(stats.live)}</strong>
+          <span>{t("home.statLive")}</span>
         </div>
       </section>
 
       <section className="section container">
         <div className="section__head">
           <div>
-            <span className="eyebrow">Featured</span>
-            <h2>Campaigns close to their goal</h2>
+            <span className="eyebrow">{t("home.featured")}</span>
+            <h2>{t("home.featuredTitle")}</h2>
           </div>
           <Link to="/discover" className="link-arrow">
-            View all <HiArrowRight />
+            {t("home.viewAll")} <HiArrowRight />
           </Link>
         </div>
         {campaigns ? (
@@ -123,7 +129,7 @@ export default function Home() {
         <div className="category-row">
           {CATEGORIES.map((cat) => (
             <Link key={cat} to={`/discover?category=${encodeURIComponent(cat)}`} className="chip chip--link">
-              {cat}
+              {t(`category.${cat}`)}
             </Link>
           ))}
         </div>
@@ -132,56 +138,49 @@ export default function Home() {
       <section className="section section--tint">
         <div className="container">
           <div className="section__head section__head--center">
-            <span className="eyebrow">How it works</span>
-            <h2>From idea to open doors in three steps</h2>
+            <span className="eyebrow">{t("nav.how")}</span>
+            <h2>{t("home.howTitle")}</h2>
           </div>
-          <div className="grid grid--3">
-            {STEPS.map(({ icon: Icon, title, text }, i) => (
-              <div key={title} className="step">
-                <span className="step__icon"><Icon size={26} /></span>
-                <span className="step__num">0{i + 1}</span>
-                <h3>{title}</h3>
-                <p className="muted">{text}</p>
-              </div>
-            ))}
-          </div>
+          <Steps />
         </div>
       </section>
 
       <section className="section container">
         <div className="section__head">
           <div>
-            <span className="eyebrow">Success stories</span>
-            <h2>Businesses our community built</h2>
+            <span className="eyebrow">{t("nav.stories")}</span>
+            <h2>{t("home.storiesTitle")}</h2>
           </div>
           <Link to="/stories" className="link-arrow">
-            Read all stories <HiArrowRight />
+            {t("home.readAll")} <HiArrowRight />
           </Link>
         </div>
         <div className="grid grid--4">
-          {STORIES.map((s) => (
-            <Link key={s.id} to={`/stories#${s.id}`} className="card story-card">
-              <div className="story-card__media">
-                <img src={s.image} alt={s.name} loading="lazy" />
-              </div>
-              <div className="story-card__body">
-                <h3>{s.title}</h3>
-                <p className="muted">{s.excerpt}</p>
-                <span className="link-arrow">Read story <HiArrowRight /></span>
-              </div>
-            </Link>
-          ))}
+          {STORIES.map((raw) => {
+            const s = storyText(raw, lang);
+            return (
+              <Link key={s.id} to={`/stories#${s.id}`} className="card story-card">
+                <div className="story-card__media">
+                  <img src={s.image} alt={s.name} loading="lazy" />
+                </div>
+                <div className="story-card__body">
+                  <h3>{s.title}</h3>
+                  <p className="muted">{s.excerpt}</p>
+                  <span className="link-arrow">{t("home.readStory")} <HiArrowRight /></span>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </section>
 
       <section className="section section--tint">
         <div className="container faq-layout">
           <div>
-            <span className="eyebrow">FAQ</span>
-            <h2>Questions, answered</h2>
+            <span className="eyebrow">{t("faq.label")}</span>
+            <h2>{t("home.faqTitle")}</h2>
             <p className="muted">
-              Can't find what you're looking for? Read the full guide on{" "}
-              <Link to="/how-it-works">how Jogaar works</Link>.
+              {t("home.faqText")} <Link to="/how-it-works">{t("home.faqLink")}</Link>.
             </p>
           </div>
           <Faq />
@@ -191,12 +190,10 @@ export default function Home() {
       <section className="section container">
         <div className="cta-band">
           <div>
-            <h2>Still not convinced? See for yourself.</h2>
-            <p>Create a free account and back your first local business today.</p>
+            <h2>{t("home.ctaTitle")}</h2>
+            <p>{t("home.ctaText")}</p>
           </div>
-          <Link to="/register" className="btn btn--accent btn--lg">
-            Get started
-          </Link>
+          <Link to="/register" className="btn btn--accent btn--lg">{t("home.ctaBtn")}</Link>
         </div>
       </section>
     </>

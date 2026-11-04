@@ -1,0 +1,234 @@
+[
+  {
+    "id": "mishu-pottery",
+    "title": "Mishu's Pottery Studio",
+    "ownerName": "Mishu Akter",
+    "category": "Crafts",
+    "location": "Dhamrai, Dhaka",
+    "image": "pottery",
+    "summary": "Expanding a family pottery business with a second kiln and a small showroom.",
+    "story": [
+      "We have run a small pottery business for three generations, making hand-painted cups, vases and planters from local clay. Demand has outgrown our single wood-fired kiln.",
+      "Your support will pay for a modern, energy-efficient kiln and a small showroom by the highway so travellers can buy directly from us instead of through middlemen.",
+      "Every backer gets our heartfelt thanks, and contributions above ৳2,000 receive a hand-painted cup from the first firing."
+    ],
+    "goal": 300000,
+    "raised": 279000,
+    "backers": 214,
+    "createdDaysAgo": 40,
+    "endsInDays": 6,
+    "rewards": [
+      {
+        "id": "r1",
+        "title": "Thank-you card",
+        "amount": 500,
+        "description": "A handwritten card from the Mishu family."
+      },
+      {
+        "id": "r2",
+        "title": "Hand-painted cup",
+        "amount": 2000,
+        "description": "A cup from the first firing of the new kiln.",
+        "limit": 100
+      },
+      {
+        "id": "r3",
+        "title": "Vase set",
+        "amount": 5000,
+        "description": "Three hand-painted vases, delivered anywhere in Dhaka.",
+        "limit": 30
+      }
+    ],
+    "updates": [
+      {
+        "id": "u2",
+        "title": "93% there — thank you!",
+        "body": "We're almost fully funded. The kiln supplier has confirmed delivery for next month, and we've started clearing space for the showroom.",
+        "daysAgo": 3
+      },
+      {
+        "id": "u1",
+        "title": "First 100 backers",
+        "body": "We never expected this much support in the first week. Every one of you will get a personal thank-you card.",
+        "daysAgo": 33
+      }
+    ],
+    "comments": [
+      {
+        "id": "c1",
+        "userName": "Nusrat Jahan",
+        "body": "Your cups are beautiful — can't wait for mine!",
+        "daysAgo": 4
+      },
+      {
+        "id": "c2",
+        "userName": "Mishu Akter",
+        "isOwner": true,
+        "body": "Thank you, Nusrat! The first firing is planned for next month.",
+        "daysAgo": 3
+      }
+    ]
+  },
+  {
+    "id": "karim-poultry",
+    "title": "Karim's Poultry Farm Expansion",
+    "ownerName": "Abdul Karim",
+    "category": "Agriculture",
+    "location": "Trishal, Mymensingh",
+    "image": "poultry",
+    "summary": "Doubling egg production with new cages, ventilation and a backup generator.",
+    "story": [
+      "I started with 200 hens in a tin shed. Today we supply eggs to six local shops and a school canteen.",
+      "Heat waves and power cuts cost us birds every summer. This campaign funds better ventilation, a backup generator and 800 more laying hens.",
+      "With the expansion we will hire three more people from our village."
+    ],
+    "goal": 500000,
+    "raised": 315000,
+    "backers": 187,
+    "createdDaysAgo": 25,
+    "endsInDays": 20,
+    "rewards": [
+      {
+        "id": "r1",
+        "title": "Farm-fresh eggs",
+        "amount": 1000,
+        "description": "Two trays of eggs, delivered in Mymensingh town."
+      },
+      {
+        "id": "r2",
+        "title": "Visit the farm",
+        "amount": 3000,
+        "description": "A guided morning on the farm with breakfast for two.",
+        "limit": 20
+      }
+    ],
+    "updates": [
+      {
+        "id": "u1",
+        "title": "Generator ordered",
+        "body": "Thanks to your support we've ordered the backup generator. No more lost birds during load-shedding this summer.",
+        "daysAgo": 8
+      }
+    ],
+    "comments": [
+      {
+        "id": "c1",
+        "userName": "Rafiq Islam",
+        "body": "Great to see local farms growing. Good luck, Karim bhai!",
+        "daysAgo": 6
+      }
+    ]
+  },
+  {
+    "id": "tangail-handloom",
+    "title": "Tangail Handloom Collective",
+    "ownerName": "Rina Begum",
+    "category": "Crafts",
+    "location": "Tangail",
+    "image": "handloom",
+    "summary": "Helping twelve weaving families sell their sarees online at fair prices.",
+    "story": [
+      "Our collective of twelve weaving families makes traditional Tangail sarees on hand looms.",
+      "We want to build a simple online shop, buy better yarn in bulk and pay for product photography so our work reaches buyers across the country.",
+      "Funds are shared transparently between all member families."
+    ],
+    "goal": 350000,
+    "raised": 189000,
+    "backers": 142,
+    "createdDaysAgo": 18,
+    "endsInDays": 27,
+    "rewards": [
+      {
+        "id": "r1",
+        "title": "Handloom scarf",
+        "amount": 1500,
+        "description": "A cotton scarf woven by the collective."
+      },
+      {
+        "id": "r2",
+        "title": "Tangail saree",
+        "amount": 6000,
+        "description": "A full handloom saree in the colour of your choice.",
+        "limit": 20
+      }
+    ]
+  },
+  {
+    "id": "retro-cafe",
+    "title": "Retro Cafe",
+    "ownerName": "Tanvir Hasan",
+    "category": "Food & Drink",
+    "location": "Zindabazar, Sylhet",
+    "image": "cafe",
+    "summary": "A cosy burger and coffee spot for students, with live music on weekends.",
+    "story": [
+      "Retro Cafe started as a food cart outside the university gate. Our burgers sold out every evening.",
+      "We have found a small space nearby and need help with the kitchen fit-out, furniture and the first three months of rent.",
+      "Backers get a free meal on opening week and their names on our wall of founders."
+    ],
+    "goal": 400000,
+    "raised": 100000,
+    "backers": 76,
+    "createdDaysAgo": 10,
+    "endsInDays": 35,
+    "rewards": [
+      {
+        "id": "r1",
+        "title": "Opening-week meal",
+        "amount": 800,
+        "description": "A burger and coffee on us during opening week."
+      },
+      {
+        "id": "r2",
+        "title": "Wall of founders",
+        "amount": 2500,
+        "description": "Your name on our founders' wall, plus the opening-week meal."
+      }
+    ]
+  },
+  {
+    "id": "mayer-dowa-jewellery",
+    "title": "Mayer Dowa Jewellery",
+    "ownerName": "Shirin & Lucky",
+    "category": "Retail",
+    "location": "New Market, Chattogram",
+    "image": "jewellery",
+    "summary": "Two sisters turning their market stall into a proper handmade jewellery shop.",
+    "story": [
+      "We make and sell handmade bangles, earrings and necklaces from a small stall in New Market.",
+      "This campaign will fund display cases, tools and stock for a permanent shop front so we can serve customers all year round."
+    ],
+    "goal": 250000,
+    "raised": 25000,
+    "backers": 19,
+    "createdDaysAgo": 5,
+    "endsInDays": 40,
+    "rewards": [
+      {
+        "id": "r1",
+        "title": "Handmade bangles",
+        "amount": 1200,
+        "description": "A pair of bangles made to your size.",
+        "limit": 50
+      }
+    ]
+  },
+  {
+    "id": "untitled-boutique",
+    "title": "Untitled Boutique House",
+    "ownerName": "Farzana Rahman",
+    "category": "Fashion",
+    "location": "Shaheb Bazar, Rajshahi",
+    "image": "boutique",
+    "summary": "Affordable, locally tailored everyday wear designed in Rajshahi.",
+    "story": [
+      "I design simple, comfortable everyday clothes and work with four local tailors.",
+      "Funding will buy two industrial sewing machines and fabric for our first full collection."
+    ],
+    "goal": 200000,
+    "raised": 10000,
+    "backers": 8,
+    "createdDaysAgo": 2,
+    "endsInDays": 43
+  }
+]
